@@ -6,11 +6,20 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-if (WIN32)
+if(WIN32)
     add_compile_definitions(_WIN32_WINNT=0x0A00)
 endif()
 
-find_package(Crow CONFIG REQUIRED)
+include(FetchContent)
+
+FetchContent_Declare(
+    Crow
+    GIT_REPOSITORY https://github.com/CrowCpp/Crow.git
+    GIT_TAG master
+)
+
+FetchContent_MakeAvailable(Crow)
+
 find_package(libpqxx CONFIG REQUIRED)
 
 add_executable(parking_backend

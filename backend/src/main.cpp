@@ -1,13 +1,21 @@
 #include "crow.h"
+#include "crow/middlewares/cors.h"
 #include <pqxx/pqxx>
 #include <iostream>
 #include <string>
 
 int main()
 {
-    crow::SimpleApp app;
+    crow::App<crow::CORSHandler> app;
 
-    // PostgreSQL test
+    auto &cors = app.get_middleware<crow::CORSHandler>();
+    cors.global()
+        .headers("Content-Type", "Accept", "Origin")
+        .methods(crow::HTTPMethod::GET, crow::HTTPMethod::POST, crow::HTTPMethod::OPTIONS)
+        .origin("*");
+
+    bool database_connected = false;
+
     try
     {
         pqxx::connection db(
@@ -19,48 +27,34 @@ int main()
 
         std::cout << "Connected to PostgreSQL successfully!" << std::endl;
 
-        pqxx::transaction<> transaction(db);
+        pqxx::work txn(db);
+        txn.exec("SELECT 1");
+        txn.commit();
 
-        pqxx::result result = transaction.exec(
-            "SELECT current_database();");
-
-        std::cout << "Database: "
-                  << result[0][0].as<std::string>()
-                  << std::endl;
-
-        transaction.commit();
-
-        std::cout << "Database query successful!" << std::endl;
+        database_connected = true;
+        std::cout << "Database check successful!" << std::endl;
     }
     catch (const std::exception &e)
     {
-        std::cerr << "Database error: "
-                  << e.what()
-                  << std::endl;
-
-        return 1;
+        std::cerr << "Database connection failed: " << e.what() << std::endl;
     }
 
-    // PostgreSQL test API
-    CROW_ROUTE(app, "/api/database")
-    ([]()
-     {
-        crow::json::wvalue response;
-
-        response["status"] = "success";
-        response["message"] = "C++ backend is connected to PostgreSQL";
-        response["database"] = "vehicle_parking";
-
-        return response; });
-
-    // Basic backend test
     CROW_ROUTE(app, "/api/hello")
     ([]()
      {
         crow::json::wvalue response;
-
         response["message"] = "C++ backend is working";
+        return response; });
 
+    CROW_ROUTE(app, "/api/database")
+    ([database_connected]()
+     {
+        crow::json::wvalue response;
+        response["status"] = database_connected ? "success" : "error";
+        response["message"] = database_connected
+            ? "C++ backend connected to PostgreSQL"
+            : "PostgreSQL connection failed. Check the backend logs.";
+        response["database"] = "parking_management";
         return response; });
 
     std::cout << "Server running on http://localhost:3000" << std::endl;
