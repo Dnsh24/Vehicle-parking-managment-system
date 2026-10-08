@@ -1,3 +1,4 @@
 {
-  "cmake.sourceDirectory": "C:/Users/dnshn/Vehicle-parking-managment-system/backend"
+  "cmake.sourceDirectory": "C:/Users/dnshn/Vehicle-parking-managment-system/backend",
+  "cmake.buildDirectory": "${workspaceFolder}/backend/build"
 }
