@@ -1,680 +1,393 @@
-# Parking Management System
+# Vehicle Parking Management System Plan
 
-## 1. Introduction
+## 1. Project status
 
-The **Parking Management System** is a digital platform designed to simplify and automate parking management for users, parking operators, and administrators.
+### Completed
 
-The system allows users to register their vehicles, search for available parking spaces, make reservations, check in using QR codes, manage parking sessions, make payments, and view their parking history.
+- Basic HTML/CSS/JavaScript frontend test page
+- Crow C++ server foundation
+- Environment-based backend configuration
+- PostgreSQL connection check using libpqxx
+- Reusable backend validation utilities with focused tests
+- Parameterized database read and write operations with transaction handling
+- Database foundation failure test
+- Configuration and API error-response tests
+- Foundation runtime verification, health checks, and CORS verification
+- `GET /api/hello`
+- `GET /api/database`
+- PostgreSQL schema with 12 core tables, constraints, and indexes
 
-Administrators can manage users, parking areas, parking slots, reservations, maintenance, payments, and system reports through an administrative dashboard.
+### In progress
 
----
+- Frontend-to-backend integration beyond the health-check page
+- Application-specific backend and integration testing
 
-# 2. User Features
+### Planned
 
-## 2.1 User Registration and Login
+- User authentication and profiles
+- Vehicle management
+- Parking-area and slot management
+- Availability search
+- Reservations and expiry
+- QR check-in and parking sessions
+- Entry, exit, overstay, and fee calculation
+- Payments, receipts, history, and notifications
+- Admin dashboard, management, and reports
 
-Users can create an account and securely log into the system.
+The existence of a database table does not mean that its related application
+feature is implemented.
 
-### Functions
+## 2. Project objective
 
-- User registration
-- User login/logout
-- Account authentication
-- Password management
-- User account validation
+Build a centralized parking-management platform for users and administrators.
+The intended system connects users, vehicles, parking areas, parking slots,
+reservations, entry and exit operations, payments, notifications, and reports.
 
----
+The technology stack is:
 
-## 2.2 User Profile
+- Frontend: HTML, CSS, JavaScript
+- Backend: C++ with Crow
+- Database: PostgreSQL
+- Communication: REST APIs
 
-Users can manage their personal information from their profile.
+## 3. Functional requirements
 
-### Functions
+### User accounts
 
-- View profile information
-- Update personal details
-- Manage account information
-- View registered vehicles
+Users should be able to register, log in, log out, manage profiles, change
+passwords, and view their registered vehicles.
 
----
+**Status:** Planned. The `users` table exists, but authentication is not
+implemented.
 
-## 2.3 Vehicle Management
+### Vehicles
 
-Users can register and manage their vehicles.
+Users should be able to add, edit, delete, and view vehicles. Vehicle types
+and EV status must be validated. A vehicle must belong to the authenticated
+user.
 
-### Functions
+**Status:** Planned. The `vehicles` table exists, but no vehicle API or UI
+exists.
 
-- Add a vehicle
-- Update vehicle information
-- Delete a vehicle
-- View registered vehicles
-- Set vehicle type
+### Parking areas and slots
 
-### Example Vehicle Types
+Administrators should manage multiple parking areas, capacities, locations,
+operating hours, parking slots, vehicle types, slot types, and EV capability.
 
-- Car
-- Bike
-- SUV
-- Electric Vehicle (EV)
-- Other supported vehicle categories
+Slot states are:
 
-Vehicle information can be associated with parking reservations and QR-based entry/exit.
+- `available`
+- `reserved`
+- `occupied`
+- `maintenance`
+- `unavailable`
 
----
+**Status:** Planned. The schema supports these values, but management APIs and
+screens do not exist.
 
-# 3. Parking Management
+### Availability and search
 
-## 3.1 Multiple Parking Areas
+Users should search by area, vehicle type, slot type, EV capability,
+availability, reservation time, and location.
 
-The system supports multiple independent parking areas.
+A slot is selectable only when it:
 
-Each parking area can have its own:
+- Supports the vehicle type
+- Meets EV requirements
+- Is not unavailable or under maintenance
+- Has no conflicting reservation
 
-- Name
-- Location
-- Operating hours
-- Parking capacity
-- Available slots
-- Vehicle-specific slots
-- EV charging facilities
+Real-time availability must not be claimed until backend state updates and
+frontend refresh behavior are implemented.
 
-This allows the system to manage parking facilities across different locations.
+**Status:** Planned.
 
----
+### Reservations
 
-## 3.2 Vehicle-Specific Parking Slots
-
-Parking slots can be assigned to specific vehicle types.
-
-For example:
-
-| Slot Type | Allowed Vehicle   |
-| --------- | ----------------- |
-| Car Slot  | Cars              |
-| Bike Slot | Bikes             |
-| SUV Slot  | SUVs              |
-| EV Slot   | Electric Vehicles |
-
-The system prevents users from reserving a slot that is incompatible with their vehicle.
-
----
-
-## 3.3 Parking Slot Management
-
-The system maintains the current state of every parking slot.
-
-### Possible Slot States
-
-- Available
-- Reserved
-- Occupied
-- Maintenance
-- Unavailable
-
-The slot status is updated whenever a reservation, entry, exit, or maintenance operation occurs.
-
----
-
-## 3.4 EV/Charging Slots
-
-Dedicated parking spaces can be configured for electric vehicles.
-
-### Functions
-
-- Identify EV-compatible slots
-- Display charging availability
-- Reserve EV parking slots
-- Track charging-enabled spaces
-- Prevent non-EV vehicles from reserving EV-only slots
-
----
-
-## 3.5 Parking Availability
-
-Users can view real-time parking availability.
-
-The system can display:
-
-- Total slots
-- Available slots
-- Reserved slots
-- Occupied slots
-- Maintenance slots
-- EV slots
-
-Availability should be updated whenever the status of a parking slot changes.
-
----
-
-## 3.6 Search and Filter
-
-Users can search for suitable parking spaces based on different criteria.
-
-### Possible Filters
-
-- Parking area
-- Vehicle type
-- Slot type
-- EV availability
-- Availability
-- Reservation time
-- Distance/location
-
-This helps users quickly find an appropriate parking space.
-
----
-
-# 4. Reservation System
-
-## 4.1 Parking Reservation
-
-Users can reserve an available parking slot for a specific period.
-
-### Reservation Information
+Users should create, view, and cancel reservations with:
 
 - User
 - Vehicle
-- Parking area
-- Parking slot
-- Reservation date
+- Area
+- Slot
 - Start time
 - End time
-- Reservation status
+- Status
 - Reservation ID
 
-### Reservation States
+Reservation statuses are:
 
-- Pending
-- Confirmed
-- Active
-- Completed
-- Expired
-- Cancelled
+- `pending`
+- `confirmed`
+- `active`
+- `completed`
+- `expired`
+- `cancelled`
 
----
+Reservation creation must validate ownership, time range, compatibility,
+availability, and maintenance state. It must use a transaction to prevent
+conflicting bookings.
 
-## 4.2 Reservation Expiry
+**Status:** Planned. The `reservations` table exists only.
 
-Reservations are automatically monitored for expiry.
+### Reservation expiry
 
-If a user does not check in within the allowed time period, the reservation can be marked as **Expired**.
+Reservations that are not used within the defined check-in window should
+become expired. A slot may be released only when it is not occupied or under
+maintenance.
 
-The associated parking slot can then be released and made available for other users.
+**Status:** Planned.
 
----
+### QR check-in and vehicle entry
 
-# 5. QR-Based Check-In
+The QR code must identify the reservation, not the device that scans it.
 
-Users can use a QR code to check into the parking facility.
-
-### Check-In Flow
-
-1. User creates a reservation.
-2. System generates a unique reservation/QR identifier.
-3. User arrives at the parking area.
-4. User scans the QR code.
-5. Backend identifies the reservation.
-6. User authentication is verified.
-7. Reservation status is checked.
-8. Vehicle and slot information are validated.
-9. Reservation is activated.
-10. Vehicle entry is recorded.
-
-The QR code should identify the **reservation**, rather than relying on the phone that performs the scan.
-
-This allows a user to scan the QR code using a different mobile device while the backend still identifies the correct reservation.
-
----
-
-# 6. Vehicle Entry
-
-The system records vehicle entry into the parking facility.
-
-### Entry Validation
-
-Before allowing entry, the system verifies:
-
-- QR code validity
-- Reservation ID
-- Reservation status
-- User authentication
-- Vehicle information
-- Parking area
-- Assigned parking slot
-- Reservation time
-
-If all conditions are satisfied, the reservation becomes active and the vehicle entry time is recorded.
-
----
-
-# 7. Vehicle Exit
-
-When the vehicle leaves the parking facility, the system records the exit.
-
-### Exit Process
-
-1. User initiates exit.
-2. Reservation/vehicle session is identified.
-3. Entry time is retrieved.
-4. Exit time is recorded.
-5. Parking duration is calculated.
-6. Any additional charges are calculated.
-7. Payment status is verified.
-8. Reservation is completed.
-9. Parking slot becomes available again.
-10. Digital receipt is generated.
-
----
-
-# 8. Overstay Detection
-
-The system automatically detects vehicles that remain parked beyond their reserved period.
-
-### Example
-
-If a user reserves a slot from:
-
-**10:00 AM → 12:00 PM**
-
-but exits at:
-
-**1:00 PM**
-
-the system identifies the additional one-hour period as an **overstay**.
-
-The system can then:
-
-- Calculate additional fees
-- Notify the user
-- Record the overstay
-- Update the reservation status
-
----
-
-# 9. Fee Calculation
-
-The system automatically calculates parking fees.
-
-The fee can depend on:
-
-- Parking duration
-- Vehicle type
-- Parking area
-- Slot type
-- EV charging usage
-- Reservation duration
-- Overstay duration
-
-### Example
-
-**Base Parking Fee**
-
-`Parking Duration × Hourly Rate`
-
-Additional charges such as overstay fees can then be added to the base amount.
-
----
-
-# 10. Payment
-
-Users can pay their parking charges through the system.
-
-### Functions
-
-- Display amount due
-- Initiate payment
-- Verify payment
-- Store payment status
-- Associate payment with reservation
-- Generate payment record
-
-### Payment States
-
-- Pending
-- Successful
-- Failed
-- Refunded
-
----
-
-# 11. Digital Receipt
-
-After a successful payment, the system generates a digital receipt.
-
-### Receipt Information
-
-- Receipt ID
-- Reservation ID
-- User
-- Vehicle
-- Parking area
-- Parking slot
-- Entry time
-- Exit time
-- Parking duration
-- Base fee
-- Overstay fee
-- Additional charges
-- Total amount
-- Payment status
-- Payment date
-
----
-
-# 12. Parking History
-
-Users can view their previous parking sessions.
-
-### History Information
-
-- Parking area
-- Vehicle
-- Parking slot
-- Reservation date
-- Entry time
-- Exit time
-- Duration
-- Amount paid
-- Payment status
-- Reservation status
-
-Users can use this section to review their previous parking activity.
-
----
-
-# 13. Notifications
-
-The system provides notifications to users regarding important parking events.
-
-### Possible Notifications
-
-- Reservation confirmation
-- Upcoming reservation
-- Reservation expiry warning
-- Reservation expired
-- Parking check-in confirmation
-- Overstay warning
-- Payment confirmation
-- Payment failure
-- Parking session completion
-- Maintenance/unavailability notification
-
----
-
-# 14. Admin Features
-
-## 14.1 Admin Dashboard
-
-The administrator has access to a centralized dashboard for managing the parking system.
-
-### Dashboard Statistics
-
-- Total users
-- Total vehicles
-- Total parking areas
-- Total parking slots
-- Available slots
-- Occupied slots
-- Reserved slots
-- Maintenance slots
-- Active reservations
-- Completed reservations
-- Total payments
-- Revenue
-- Overstays
-
----
-
-# 15. User Management
-
-Administrators can manage registered users.
-
-### Functions
-
-- View users
-- Search users
-- View user details
-- View registered vehicles
-- Activate/deactivate accounts
-- Manage user access
-
----
-
-# 16. Parking-Area Management
-
-Administrators can create and manage parking facilities.
-
-### Functions
-
-- Add parking area
-- Update parking area
-- Remove parking area
-- Configure parking capacity
-- Configure operating hours
-- View parking availability
-- Manage parking-area status
-
-Each parking area can contain multiple parking slots.
-
----
-
-# 17. Slot Management
-
-Administrators can manage individual parking slots.
-
-### Functions
-
-- Add slots
-- Update slots
-- Remove slots
-- Assign slot types
-- Assign vehicle types
-- Configure EV slots
-- Change slot status
-- View slot occupancy
-
-### Slot Status
-
-Administrators can manually or automatically set slots as:
-
-- Available
-- Reserved
-- Occupied
-- Maintenance
-- Unavailable
-
----
-
-# 18. Maintenance Slots
-
-Parking slots may occasionally need to be unavailable because of maintenance.
-
-Administrators can mark specific slots as **Maintenance**.
-
-### Functions
-
-- Mark slot for maintenance
-- Specify maintenance period
-- Add maintenance reason
-- Prevent reservations during maintenance
-- Return slot to available status after maintenance
-
-This prevents users from reserving a slot that cannot currently be used.
-
----
-
-# 19. Reservation Management
-
-Administrators can monitor and manage all reservations.
-
-### Functions
-
-- View reservations
-- Search reservations
-- Filter by status
-- View reservation details
-- Cancel reservations
-- Modify reservation status
-- Monitor active reservations
-- Monitor expired reservations
-- Monitor overstays
-
----
-
-# 20. Payment Management
-
-Administrators can monitor payment transactions.
-
-### Functions
-
-- View transactions
-- Search payments
-- Filter payments
-- View payment status
-- View transaction details
-- Track successful/failed payments
-- Manage refunds where applicable
-
----
-
-# 21. Reports and Statistics
-
-The system provides reports to help administrators understand parking usage and system performance.
-
-### Possible Reports
-
-#### Parking Usage
-
-- Total parking sessions
-- Daily parking sessions
-- Weekly parking sessions
-- Monthly parking sessions
-- Slot utilization
-
-#### Revenue
-
-- Daily revenue
-- Weekly revenue
-- Monthly revenue
-- Revenue by parking area
-- Revenue by vehicle type
-
-#### Reservations
-
-- Total reservations
-- Completed reservations
-- Cancelled reservations
-- Expired reservations
-- Active reservations
-
-#### Overstay
-
-- Number of overstays
-- Total overstay duration
-- Overstay revenue
-
-These statistics can help administrators identify busy parking areas, frequently used slots, and revenue trends.
-
----
-
-# 22. Feature Summary
-
-| Module                     | Features                                           |
-| -------------------------- | -------------------------------------------------- |
-| **User Account**           | Registration, Login, Profile                       |
-| **Vehicle**                | Add, Edit, Delete, Manage Vehicles                 |
-| **Parking**                | Multiple Areas, Slots, Vehicle-Specific Slots      |
-| **EV Parking**             | EV/Charging Slots                                  |
-| **Availability**           | Real-Time Parking Availability                     |
-| **Search**                 | Search and Filtering                               |
-| **Reservation**            | Create, Manage, Expire, Cancel                     |
-| **QR System**              | QR-Based Check-In                                  |
-| **Entry**                  | Vehicle Entry Validation                           |
-| **Exit**                   | Vehicle Exit Processing                            |
-| **Overstay**               | Overstay Detection and Charges                     |
-| **Fees**                   | Automatic Fee Calculation                          |
-| **Payment**                | Payment Processing                                 |
-| **Receipt**                | Digital Receipt                                    |
-| **History**                | Parking History                                    |
-| **Notifications**          | Reservation, Payment, Overstay Alerts              |
-| **Admin**                  | Dashboard and System Management                    |
-| **User Management**        | Manage Users                                       |
-| **Parking Management**     | Manage Parking Areas                               |
-| **Slot Management**        | Manage Parking Slots                               |
-| **Maintenance**            | Maintenance Slot Management                        |
-| **Reservation Management** | Monitor and Manage Reservations                    |
-| **Payment Management**     | Monitor Transactions                               |
-| **Reports**                | Parking, Revenue, Reservation and Usage Statistics |
-
-# 23. Overall System Flow
+The check-in flow is:
 
 ```text
-User Registration/Login
-        ↓
-Add Vehicle
-        ↓
-Search Parking Areas
-        ↓
-Check Parking Availability
-        ↓
-Select Vehicle + Parking Slot
-        ↓
-Create Reservation
-        ↓
-Receive Reservation Confirmation + QR
-        ↓
-Arrive at Parking Area
-        ↓
-Scan QR Code
-        ↓
-Validate Reservation
-        ↓
-Vehicle Entry
-        ↓
-Parking Session
-        ↓
-Overstay Detection
-        ↓
-Vehicle Exit
-        ↓
-Calculate Parking Fee
-        ↓
-Payment
-        ↓
-Digital Receipt
-        ↓
-Parking History
+Reservation → QR token → Scan → Validate token and reservation
+→ Validate user, vehicle, time, and slot → Create session
+→ Mark reservation active and slot occupied
 ```
 
-## Admin Flow
+Validation must cover token expiry and reuse, authentication, reservation
+status, vehicle/slot compatibility, parking area, and reservation time.
+
+**Status:** Planned. The `qr_tokens` table exists, but no QR or entry logic
+exists.
+
+### Parking sessions and exit
+
+On entry, create a parking session and record `entry_time`. On exit:
+
+1. Identify the active session.
+2. Record `exit_time`.
+3. Calculate duration.
+4. Calculate overstay and fees.
+5. Complete the session and reservation.
+6. Release the slot only when it is not under maintenance.
+7. Continue to payment and receipt generation.
+
+The entry and exit state changes must be transactional.
+
+**Status:** Planned. The `parking_sessions` table exists only.
+
+### Overstay and fees
+
+Overstay is calculated from the reserved end time and actual exit time:
 
 ```text
-Admin Login
-     ↓
-Admin Dashboard
-     ↓
-Manage Users
-     ↓
-Manage Parking Areas
-     ↓
-Manage Parking Slots
-     ↓
-Manage EV Slots
-     ↓
-Manage Maintenance
-     ↓
-Monitor Reservations
-     ↓
-Monitor Payments
-     ↓
-Generate Reports & Statistics
+overstay_duration = max(0, actual_exit_time - reserved_end_time)
 ```
 
-# 24. System Objective
+Fees may depend on parking duration, vehicle type, area, slot type, EV usage,
+reservation duration, and overstay duration.
 
-The primary objective of the Parking Management System is to provide a **centralized, automated, and efficient parking management solution**.
+```text
+base_fee = parking_duration × hourly_rate
+total_fee = base_fee + overstay_fee + additional_charges
+```
 
-The system connects users, vehicles, parking areas, parking slots, reservations, entry/exit operations, payments, and administrative management into a single platform.
+Billing units, rounding, minimum charges, and missing-rate behavior must be
+defined before implementation.
 
-It aims to reduce manual parking management, improve slot utilization, simplify reservations and payments, and provide administrators with real-time visibility into parking operations.
+**Status:** Planned. Rate and fee tables exist, but no calculation service
+exists.
+
+### Payments and receipts
+
+Users should be able to initiate and verify payments. Payment statuses are:
+
+- `pending`
+- `successful`
+- `failed`
+- `refunded`
+
+Successful payments should produce receipts containing the reservation,
+session, timing, fee breakdown, payment status, and receipt number.
+
+Payment processing must not be described as implemented without a working
+payment flow.
+
+**Status:** Planned. The `payments` and `receipts` tables exist only.
+
+### History and notifications
+
+Users should view previous reservations, sessions, durations, payment status,
+amounts, and receipts.
+
+Notifications should support reservation confirmation, expiry, check-in,
+overstay, payment, session completion, and maintenance events.
+
+**Status:** Planned. The `notifications` table exists, but no services or
+frontend screens exist.
+
+## 4. Administrator requirements
+
+Administrators should be able to:
+
+- View dashboard statistics
+- Manage users and account access
+- Manage parking areas and slots
+- Configure EV slots and rates
+- Schedule slot maintenance
+- Monitor and manage reservations
+- Monitor payments and refunds
+- Generate parking, revenue, reservation, and overstay reports
+
+Dashboard statistics should include users, vehicles, areas, slots, slot
+statuses, reservations, payments, revenue, and overstays.
+
+**Status:** Planned. No admin authentication, APIs, or dashboard exists.
+
+## 5. Build phases
+
+Each phase follows this sequence:
+
+```text
+Database review → Backend logic and API → Backend tests
+→ Frontend screen → Frontend integration → End-to-end tests
+→ Update API.md and this plan
+```
+
+Proposed endpoints must not be added to [API.md](API.md) until implemented
+and tested.
+
+### Phase 0: Foundation
+
+**Status:** Completed.
+
+- Centralize configuration and database access.
+- Add validation utilities and consistent JSON errors.
+- Add parameterized-query and transaction conventions.
+- Add backend tests.
+- Keep the health endpoints working.
+- Verify runtime startup, PostgreSQL connectivity, CORS behavior, and secret
+  safety.
+
+### Phase 1: Parking availability
+
+**Status:** Next.
+
+- Backend: query areas and slots and expose tested REST endpoints.
+- Frontend: display areas, select an area, and show slot states.
+- Test invalid areas, empty areas, database failures, occupied slots, and
+  maintenance slots.
+
+References: `parking_areas`, `parking_slots`, and `maintenance` in
+[database.md](database.md).
+
+### Phase 2: Authentication and profiles
+
+- Backend: registration, login, logout, password hashing, authorization, and
+  profile operations.
+- Frontend: registration, login, logout, profile, and protected views.
+- Test duplicate emails, invalid credentials, inactive accounts, and
+  unauthenticated access.
+
+Reference: `users` in [database.md](database.md).
+
+### Phase 3: Vehicle management
+
+- Backend: authenticated vehicle CRUD and ownership validation.
+- Frontend: vehicle list, add, edit, delete, vehicle type, and EV controls.
+- Test duplicate registrations, invalid types, and unauthorized access.
+
+Reference: `vehicles` in [database.md](database.md).
+
+### Phase 4: Administration and maintenance
+
+- Backend: administrator-only area, slot, rate, user, and maintenance
+  operations.
+- Frontend: dashboard shell and management screens.
+- Test roles, slot compatibility, duplicate slot numbers, maintenance
+  periods, and invalid status changes.
+
+References: Sections 4 and 15; related tables in [database.md](database.md).
+
+### Phase 5: Search and reservations
+
+- Backend: filtered availability, reservation creation, listing, details,
+  cancellation, and conflict protection.
+- Frontend: filters, reservation form, confirmation, status, and cancellation.
+- Test ownership, compatibility, time ranges, overlapping reservations, and
+  concurrent requests.
+
+References: `reservations`, `parking_slots`, and `parking_rates` in
+[database.md](database.md).
+
+### Phase 6: Expiry, QR, entry, and sessions
+
+- Backend: expiry process, reservation-linked QR tokens, check-in validation,
+  session creation, and entry state transitions.
+- Frontend: expiry warnings, QR display/scanning, check-in result, and active
+  session screen.
+- Test expired, reused, invalid, and unauthorized tokens, duplicate entry,
+  and maintenance slots.
+
+References: `qr_tokens`, `reservations`, and `parking_sessions` in
+[database.md](database.md).
+
+### Phase 7: Exit, overstay, fees, payments, and receipts
+
+- Backend: transactional exit, duration, overstay, fee calculation, payment
+  processing, and receipt generation.
+- Frontend: exit confirmation, fee breakdown, payment screen, and receipt.
+- Test normal exit, overstay, duplicate payment, amount tampering, failed
+  payment, refund, and receipt ownership.
+
+References: `parking_sessions`, `parking_rates`, `payments`, and `receipts`
+in [database.md](database.md).
+
+### Phase 8: History and notifications
+
+- Backend: user-scoped history, receipts, notifications, unread status, and
+  event notifications.
+- Frontend: history list, receipt links, notification list, unread count, and
+  mark-as-read behavior.
+- Test user isolation, pagination, empty results, and notification ownership.
+
+References: `reservations`, `parking_sessions`, `payments`, `receipts`, and
+`notifications` in [database.md](database.md).
+
+### Phase 9: Admin dashboard and reports
+
+- Backend: authorized dashboard aggregates and reports.
+- Frontend: statistics, charts, filters, tables, and optional exports.
+- Test totals against known data, date boundaries, empty periods, and roles.
+
+References: Sections 4, 15, and 16.
+
+## 6. Phase dependencies
+
+```text
+Foundation
+  ↓
+Parking availability
+  ↓
+Authentication
+  ↓
+Vehicles
+  ↓
+Administration and maintenance
+  ↓
+Search and reservations
+  ↓
+Expiry, QR, entry, and sessions
+  ↓
+Exit, overstay, fees, payments, and receipts
+  ↓
+History and notifications
+  ↓
+Admin dashboard and reports
+```
+
+Mark a feature **Completed** only after its backend, frontend, integration,
+and relevant error-path tests pass.
+
+## 7. Documentation references
+
+- [README.md](README.md) — overview, setup, and current implementation
+- [API.md](API.md) — verified REST endpoints only
+- [database.md](database.md) — actual PostgreSQL schema
+- [OOPS.md](OOPS.md) — actual C++ structure and OOP concepts

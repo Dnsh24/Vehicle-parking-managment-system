@@ -10,7 +10,7 @@ async function callApi(endpoint, result, loadingMessage) {
         const data = await response.json();
 
         if (!response.ok || data.status === "error") {
-            result.textContent = data.message || "Database connection failed";
+            result.textContent = data.error?.message || data.message || "Database connection failed";
             return;
         }
 

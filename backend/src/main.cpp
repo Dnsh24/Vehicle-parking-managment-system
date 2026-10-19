@@ -1,42 +1,44 @@
 #include "crow.h"
 #include "crow/middlewares/cors.h"
-#include <pqxx/pqxx>
+#include "api/errors.h"
+#include "config/config.h"
+#include "database/database.h"
+
+#include <exception>
 #include <iostream>
-#include <string>
 
 int main()
 {
+    BackendConfig config;
+    try
+    {
+        config = BackendConfig::fromEnvironment();
+    }
+    catch (const std::exception &exception)
+    {
+        std::cerr << "Configuration error: " << exception.what() << std::endl;
+        return 1;
+    }
+
     crow::App<crow::CORSHandler> app;
 
     auto &cors = app.get_middleware<crow::CORSHandler>();
     cors.global()
-        .headers("Content-Type", "Accept", "Origin")
+        .headers("Content-Type, Accept, Origin")
         .methods(crow::HTTPMethod::GET, crow::HTTPMethod::POST, crow::HTTPMethod::OPTIONS)
         .origin("*");
 
-    bool database_connected = false;
+    Database database(config);
+    const DatabaseCheckResult database_check = database.checkConnection();
 
-    try
+    if (database_check.connected)
     {
-        pqxx::connection db(
-            "host=localhost "
-            "port=5432 "
-            "dbname=parking_management "
-            "user=postgres "
-            "password=@24Dinesh");
-
-        std::cout << "Connected to PostgreSQL successfully!" << std::endl;
-
-        pqxx::work txn(db);
-        txn.exec("SELECT 1");
-        txn.commit();
-
-        database_connected = true;
         std::cout << "Database check successful!" << std::endl;
     }
-    catch (const std::exception &e)
+    else
     {
-        std::cerr << "Database connection failed: " << e.what() << std::endl;
+        std::cerr << "Database connection failed: "
+                  << database_check.error_message << std::endl;
     }
 
     CROW_ROUTE(app, "/api/hello")
@@ -47,19 +49,25 @@ int main()
         return response; });
 
     CROW_ROUTE(app, "/api/database")
-    ([database_connected]()
+    ([database_check, database_name = config.database_name]()
      {
+        if (!database_check.connected)
+        {
+            return api::errorResponse(
+                503,
+                "DATABASE_UNAVAILABLE",
+                "PostgreSQL is unavailable. Check the backend logs.");
+        }
+
         crow::json::wvalue response;
-        response["status"] = database_connected ? "success" : "error";
-        response["message"] = database_connected
-            ? "C++ backend connected to PostgreSQL"
-            : "PostgreSQL connection failed. Check the backend logs.";
-        response["database"] = "parking_management";
-        return response; });
+        response["status"] = "success";
+        response["message"] = "C++ backend connected to PostgreSQL";
+        response["database"] = database_name;
+        return crow::response(response); });
 
-    std::cout << "Server running on http://localhost:3000" << std::endl;
+    std::cout << "Server running on http://localhost:" << config.server_port << std::endl;
 
-    app.port(3000).multithreaded().run();
+    app.port(config.server_port).multithreaded().run();
 
     return 0;
 }
