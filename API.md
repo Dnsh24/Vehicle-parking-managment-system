@@ -2,14 +2,13 @@
 
 ## Current status
 
-The API is at an initial integration stage. The following routes are
-implemented in `backend/src/main.cpp`; no parking-management CRUD API has been
-implemented yet.
+The API now includes the first read-only parking-availability resources.
+Authentication and parking-management write operations are not implemented.
 
 | Component | Current status |
 | --- | --- |
 | Crow backend | Implemented as an initial server |
-| REST endpoints | Two test endpoints implemented |
+| REST endpoints | Health endpoints and parking-availability read endpoints implemented |
 | PostgreSQL through C++ | Connectivity check implemented |
 | Frontend API integration | Implemented for the two test endpoints |
 | Authentication and authorization | Not implemented |
@@ -64,6 +63,61 @@ The route reports the startup connectivity result; it does not perform a new
 database query for each request. Other future API errors should use the same
 `error.code` and `error.message` structure.
 
+### `GET /api/parking-areas`
+
+Returns every configured parking area. Under the Phase 1 design, each mall
+floor is represented as a separate parking area. `available_slots` is
+calculated from the current slot statuses.
+
+Example response:
+
+```json
+{
+  "areas": [
+    {
+      "area_id": 1,
+      "name": "Mall Central — Ground Floor",
+      "location": "Mall Central",
+      "operating_hours": "07:00 - 22:00",
+      "capacity": 32,
+      "status": "active",
+      "available_slots": 12
+    }
+  ]
+}
+```
+
+Database failures return `503 DATABASE_UNAVAILABLE`.
+
+### `GET /api/parking-areas/{area_id}/slots`
+
+Returns the selected floor and all of its configured parking slots.
+
+Example response:
+
+```json
+{
+  "area": {
+    "area_id": 1,
+    "name": "Mall Central — Ground Floor"
+  },
+  "slots": [
+    {
+      "slot_id": 1,
+      "area_id": 1,
+      "slot_number": "G-A01",
+      "vehicle_type": "car",
+      "slot_type": "standard",
+      "is_ev": false,
+      "status": "available"
+    }
+  ]
+}
+```
+
+An unknown area returns `404 PARKING_AREA_NOT_FOUND`. Database failures
+return `503 DATABASE_UNAVAILABLE`.
+
 ## Frontend usage
 
 `frontend/js/app.js` calls both routes using `fetch` against
@@ -76,7 +130,7 @@ The following areas are planned, not implemented:
 
 - Authentication and user management
 - Vehicle management
-- Parking-area, slot, and rate management
+- Parking-area, slot, and rate management writes
 - Availability and reservation operations
 - QR-token check-in
 - Parking sessions and checkout

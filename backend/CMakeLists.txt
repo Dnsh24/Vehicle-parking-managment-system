@@ -26,6 +26,7 @@ find_package(libpqxx CONFIG REQUIRED)
 
 add_executable(parking_backend
     src/main.cpp
+    src/api/parking_responses.h
     src/config/config.cpp
     src/database/database.cpp
     src/validation/validation.cpp

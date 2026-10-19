@@ -147,6 +147,18 @@ psql -U <user> -d parking_management -f database/schema.sql
 The schema file creates the `pgcrypto` extension and all 12 tables. Do not put
 real passwords in documentation or source code.
 
+For local Phase 1 development data, run the repeatable seed script after the
+schema:
+
+```text
+psql -U <user> -d parking_management -f database/seed_phase1.sql
+```
+
+The seed creates three Mall Central floor areas with 32 slots each. It includes
+four truck slots, ten bike/scooter slots, twelve normal car slots, three EV
+slots, and three handicapped slots per floor. It uses example availability
+states and must not be used as production data.
+
 ### Backend
 
 The backend requires CMake 3.20 or newer, a C++20 compiler, Crow, and
