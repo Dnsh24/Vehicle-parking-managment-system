@@ -36,13 +36,29 @@ pqxx::connection Database::createConnection() const
         " password=" + quoteConnectionValue(config_.database_password));
 }
 
+DatabaseCheckResult Database::checkConnection() const
+{
+    try
+    {
+        pqxx::connection connection = createConnection();
+        pqxx::work transaction(connection);
+        transaction.exec("SELECT 1");
+        transaction.commit();
+        return {true, {}};
+    }
+    catch (const std::exception &exception)
+    {
+        return {false, exception.what()};
+    }
+}
+
 pqxx::result Database::executeRead(
     const std::string &query,
     const pqxx::params &parameters) const
 {
     pqxx::connection connection = createConnection();
     pqxx::read_transaction transaction(connection);
-    return transaction.exec(query, parameters);
+    return transaction.exec_params(query, parameters);
 }
 
 pqxx::result Database::executeWrite(
@@ -51,20 +67,7 @@ pqxx::result Database::executeWrite(
 {
     pqxx::connection connection = createConnection();
     pqxx::work transaction(connection);
-    pqxx::result result = transaction.exec(query, parameters);
+    const pqxx::result result = transaction.exec_params(query, parameters);
     transaction.commit();
     return result;
-}
-
-DatabaseCheckResult Database::checkConnection() const
-{
-    try
-    {
-        executeRead("SELECT 1");
-        return {true, {}};
-    }
-    catch (const std::exception &exception)
-    {
-        return {false, exception.what()};
-    }
 }

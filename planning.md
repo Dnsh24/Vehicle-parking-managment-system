@@ -24,15 +24,8 @@
 
 ### Planned
 
-- User authentication and profiles
-- Vehicle management
-- Parking-area and slot management
-- Availability search
-- Reservations and expiry
-- QR check-in and parking sessions
-- Entry, exit, overstay, and fee calculation
-- Payments, receipts, history, and notifications
-- Admin dashboard, management, and reports
+- Version 1: core parking operations
+- Version 2: automation, online payments, advanced notifications, and reports
 
 The existence of a database table does not mean that its related application
 feature is implemented.
@@ -253,7 +246,21 @@ Database review → Backend logic and API → Backend tests
 Proposed endpoints must not be added to [API.md](API.md) until implemented
 and tested.
 
-### Phase 0: Foundation
+### Version 1: Core parking operations
+
+Version 1 delivers the smallest complete user journey:
+
+```text
+Register → Add vehicle → Find a slot → Reserve
+→ Check in manually → Park → Check out manually
+→ Calculate fee → View history and notifications
+```
+
+Version 1 includes basic overstay billing and in-app notifications. It does
+not include QR scanning, online payment gateways, downloadable receipts, or
+advanced reporting.
+
+#### Phase 0: Foundation
 
 **Status:** Completed.
 
@@ -265,19 +272,23 @@ and tested.
 - Verify runtime startup, PostgreSQL connectivity, CORS behavior, and secret
   safety.
 
-### Phase 1: Parking availability
+#### Phase 1: Parking availability
 
-**Status:** Next.
+**Status:** Backend endpoints and frontend API integration implemented;
+database-backed runtime verification remains.
 
-- Backend: query areas and slots and expose tested REST endpoints.
-- Frontend: display areas, select an area, and show slot states.
+- Backend: query areas and slots and expose read-only REST endpoints.
+- Frontend: load areas and slots from the API, select a floor, and show slot
+  states with loading, empty, error, and retry states.
+- Backend response-shape tests are implemented. Runtime tests still need a
+  PostgreSQL instance seeded with the three mall floors.
 - Test invalid areas, empty areas, database failures, occupied slots, and
-  maintenance slots.
+  maintenance slots against the running database.
 
 References: `parking_areas`, `parking_slots`, and `maintenance` in
 [database.md](database.md).
 
-### Phase 2: Authentication and profiles
+#### Phase 2: Authentication and profiles
 
 - Backend: registration, login, logout, password hashing, authorization, and
   profile operations.
@@ -287,7 +298,7 @@ References: `parking_areas`, `parking_slots`, and `maintenance` in
 
 Reference: `users` in [database.md](database.md).
 
-### Phase 3: Vehicle management
+#### Phase 3: Vehicle management
 
 - Backend: authenticated vehicle CRUD and ownership validation.
 - Frontend: vehicle list, add, edit, delete, vehicle type, and EV controls.
@@ -295,17 +306,18 @@ Reference: `users` in [database.md](database.md).
 
 Reference: `vehicles` in [database.md](database.md).
 
-### Phase 4: Administration and maintenance
+#### Phase 4: Basic administration and maintenance
 
 - Backend: administrator-only area, slot, rate, user, and maintenance
   operations.
-- Frontend: dashboard shell and management screens.
+- Frontend: basic management screens for parking areas, slots, rates, and
+  users.
 - Test roles, slot compatibility, duplicate slot numbers, maintenance
   periods, and invalid status changes.
 
 References: Sections 4 and 15; related tables in [database.md](database.md).
 
-### Phase 5: Search and reservations
+#### Phase 5: Search and reservations
 
 - Backend: filtered availability, reservation creation, listing, details,
   cancellation, and conflict protection.
@@ -316,41 +328,92 @@ References: Sections 4 and 15; related tables in [database.md](database.md).
 References: `reservations`, `parking_slots`, and `parking_rates` in
 [database.md](database.md).
 
-### Phase 6: Expiry, QR, entry, and sessions
+#### Phase 6: Manual entry and parking sessions
 
-- Backend: expiry process, reservation-linked QR tokens, check-in validation,
-  session creation, and entry state transitions.
-- Frontend: expiry warnings, QR display/scanning, check-in result, and active
-  session screen.
+- Backend: validate the reservation check-in window, create sessions, record
+  entry, and perform manual check-in state transitions.
+- Frontend: reservation check-in button, check-in result, and active session
+  screen.
+- Test expired and unauthorized reservations, duplicate entry, and
+  maintenance slots.
+
+References: `reservations` and `parking_sessions` in
+[database.md](database.md).
+
+#### Phase 7: Manual exit, basic overstay billing, and fee summary
+
+- Backend: transactional exit, duration, basic overstay calculation, and fee
+  summary generation.
+- Frontend: exit confirmation, entry and exit times, overstay duration, and
+  fee breakdown.
+- Use the Version 1 rule:
+
+  ```text
+  overstay_duration = max(0, actual_exit_time - reserved_end_time)
+  total_fee = parking_duration × hourly_rate + overstay_duration × overstay_rate
+  ```
+
+- Record the fee as unpaid, paid manually, or waived. Do not integrate an
+  online payment gateway in Version 1.
+- Test normal exit, overstay, duplicate exit, invalid session ownership, and
+  fee calculation boundaries.
+
+References: `parking_sessions` and `parking_rates` in [database.md](database.md).
+
+#### Phase 8: Basic history and in-app notifications
+
+- Backend: user-scoped history, notifications, unread status, and event
+  notifications for reservation confirmation, cancellation, check-in, exit,
+  overstay, and fee status.
+- Frontend: history list, fee summaries, notification list, unread count, and
+  mark-as-read behavior.
+- Test user isolation, pagination, empty results, and notification ownership.
+
+References: `reservations`, `parking_sessions`, and `notifications` in
+[database.md](database.md).
+
+### Version 2: Automation, payments, and advanced management
+
+Version 2 builds on the completed Version 1 workflow. These features must not
+be shown as available in the Version 1 interface until their backend,
+frontend, integration, and tests are complete.
+
+#### Phase 9: QR check-in and automated expiry
+
+- Backend: reservation-linked QR tokens, token expiry and reuse protection,
+  automated reservation expiry, QR check-in validation, and entry state
+  transitions.
+- Frontend: expiry countdowns, QR display and scanning, and QR check-in
+  results.
 - Test expired, reused, invalid, and unauthorized tokens, duplicate entry,
   and maintenance slots.
 
 References: `qr_tokens`, `reservations`, and `parking_sessions` in
 [database.md](database.md).
 
-### Phase 7: Exit, overstay, fees, payments, and receipts
+#### Phase 10: Online payments and digital receipts
 
-- Backend: transactional exit, duration, overstay, fee calculation, payment
-  processing, and receipt generation.
-- Frontend: exit confirmation, fee breakdown, payment screen, and receipt.
-- Test normal exit, overstay, duplicate payment, amount tampering, failed
-  payment, refund, and receipt ownership.
+- Backend: payment initiation and verification, payment status transitions,
+  refund handling, amount validation, and receipt generation.
+- Frontend: payment methods, payment status, receipt details, and optional
+  receipt download.
+- Test duplicate payment, amount tampering, failed payment, refund, and
+  receipt ownership.
 
-References: `parking_sessions`, `parking_rates`, `payments`, and `receipts`
+References: `payments`, `receipts`, `parking_sessions`, and `parking_rates`
 in [database.md](database.md).
 
-### Phase 8: History and notifications
+#### Phase 11: Advanced fees, notifications, and maintenance
 
-- Backend: user-scoped history, receipts, notifications, unread status, and
-  event notifications.
-- Frontend: history list, receipt links, notification list, unread count, and
-  mark-as-read behavior.
-- Test user isolation, pagination, empty results, and notification ownership.
+- Backend: vehicle-, area-, slot-, and EV-specific rates; configurable
+  rounding and minimum charges; detailed overstay rules; scheduled
+  maintenance; and expanded notification events.
+- Frontend: advanced fee explanations, maintenance schedules, and richer
+  notification details.
+- Add external delivery such as email or SMS only after in-app notifications
+  are stable and tested.
 
-References: `reservations`, `parking_sessions`, `payments`, `receipts`, and
-`notifications` in [database.md](database.md).
-
-### Phase 9: Admin dashboard and reports
+#### Phase 12: Admin dashboard and reports
 
 - Backend: authorized dashboard aggregates and reports.
 - Frontend: statistics, charts, filters, tables, and optional exports.
@@ -361,31 +424,64 @@ References: Sections 4, 15, and 16.
 ## 6. Phase dependencies
 
 ```text
-Foundation
+Version 1: Foundation
   ↓
-Parking availability
+Version 1: Parking availability
   ↓
-Authentication
+Version 1: Authentication
   ↓
-Vehicles
+Version 1: Vehicles
   ↓
-Administration and maintenance
+Version 1: Basic administration and maintenance
   ↓
-Search and reservations
+Version 1: Search and reservations
   ↓
-Expiry, QR, entry, and sessions
+Version 1: Manual entry and sessions
   ↓
-Exit, overstay, fees, payments, and receipts
+Version 1: Exit, basic overstay billing, and fee summary
   ↓
-History and notifications
+Version 1: History and in-app notifications
   ↓
-Admin dashboard and reports
+Version 2: QR and automated expiry
+  ↓
+Version 2: Online payments and receipts
+  ↓
+Version 2: Advanced fees, notifications, maintenance, and reports
 ```
 
 Mark a feature **Completed** only after its backend, frontend, integration,
-and relevant error-path tests pass.
+and relevant error-path tests pass. A Version 2 feature must not be marked
+implemented merely because its database tables already exist.
 
-## 7. Documentation references
+## 7. Version boundaries
+
+### Version 1 includes
+
+- User registration, login, logout, and basic profiles
+- Vehicle management
+- Parking-area and slot availability
+- Basic administrator management
+- Reservations and cancellation
+- Manual check-in and check-out
+- Parking sessions
+- Basic duration and overstay billing
+- Manual payment or fee-status recording
+- Reservation and parking history
+- In-app notifications and unread status
+
+### Version 2 includes
+
+- QR-based check-in
+- Automated reservation expiry
+- Online payment gateway integration
+- Payment verification and refunds
+- Digital and downloadable receipts
+- Advanced fee rules and rate configuration
+- Scheduled maintenance
+- Email/SMS or other external notifications
+- Admin dashboard, charts, reports, and exports
+
+## 8. Documentation references
 
 - [README.md](README.md) — overview, setup, and current implementation
 - [API.md](API.md) — verified REST endpoints only

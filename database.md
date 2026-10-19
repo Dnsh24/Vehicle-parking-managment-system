@@ -259,6 +259,20 @@ been benchmarked. Transactions are used by the schema file while creating the
 objects. Application transactions for reservations, sessions, or payments
 remain to be implemented.
 
+## Phase 1 development seed
+
+`database/seed_phase1.sql` creates the three parking areas used by the Phase 1
+prototype:
+
+- Mall Central - Ground Floor
+- Mall Central - First Floor
+- Mall Central - Second Floor
+
+Each floor receives 32 slots: four truck, ten bike/scooter, twelve normal car,
+three EV, and three handicapped slots. The script is repeatable for these names
+and uses example slot statuses for local development only. It does not replace
+production data or create user accounts.
+
 ## DBMS concepts
 
 The schema uses relational entities and foreign-key relationships, domain
