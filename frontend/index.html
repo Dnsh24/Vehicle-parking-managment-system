@@ -7,20 +7,49 @@
     <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
-    <header class="topbar">
-      <a class="brand" href="#" aria-label="Parkwise home">
+    <header class="topbar" id="topbar" hidden>
+      <a class="brand" href="#" aria-label="ParkFlow home">
         <span class="brand-mark" aria-hidden="true">P</span>
         <span>
-          <strong>Parkwise</strong>
-          <small>Campus parking</small>
+          <strong>ParkFlow</strong>
+          <small>PARKING MANAGEMENT SYSTEM</small>
         </span>
       </a>
       <div class="topbar-status"><span class="pulse"></span> Live availability</div>
       <button class="icon-button" type="button" aria-label="Notifications">♡</button>
-      <div class="avatar" aria-label="User profile">JD</div>
+      <button class="avatar" id="logoutButton" type="button" aria-label="Log out">JD</button>
     </header>
 
-    <main class="page-shell">
+    <section class="auth-gate" id="authGate">
+      <div class="auth-screen" id="loginScreen">
+        <div class="auth-brand"><span class="auth-brand-mark">P</span><span><strong>ParkFlow</strong><small>PARKING MANAGEMENT SYSTEM</small></span></div>
+        <h1>Log In</h1>
+        <p class="auth-description">Please enter your credentials to access<br />your dashboard.</p>
+        <form id="loginForm" class="auth-form">
+          <label class="auth-input"><span aria-hidden="true">♙</span><input name="email" type="text" placeholder="Username or Email" autocomplete="username" required /></label>
+          <label class="auth-input"><span aria-hidden="true">♙</span><input name="password" type="password" placeholder="Password" autocomplete="current-password" required /><button class="password-toggle" type="button" data-password-toggle="loginPassword" aria-label="Show password">Show</button></label>
+          <div class="auth-options"><button class="forgot-password" id="forgotPasswordButton" type="button">Forgot Password?</button><label class="remember-option"><input name="remember_me" type="checkbox" /> Remember me</label></div>
+          <button class="auth-submit" type="submit">Log In</button>
+        </form>
+        <button class="auth-switch" id="registerSwitch" type="button">Don't have an account? Register</button>
+      </div>
+      <div class="auth-screen" id="registerScreen" hidden>
+        <div class="auth-brand"><span class="auth-brand-mark">P</span><span><strong>ParkFlow</strong><small>PARKING MANAGEMENT SYSTEM</small></span></div>
+        <h1>Register</h1>
+        <p class="auth-description">Create your account to access<br />your parking dashboard.</p>
+        <form id="registerForm" class="auth-form">
+          <label class="auth-input"><span aria-hidden="true">♙</span><input name="username" type="text" placeholder="Username" maxlength="50" autocomplete="username" required /></label>
+          <label class="auth-input"><span aria-hidden="true">@</span><input name="email" type="email" placeholder="Email" autocomplete="email" required /></label>
+          <label class="auth-input"><span aria-hidden="true">♙</span><input name="password" type="password" placeholder="Password" minlength="8" autocomplete="new-password" required /><button class="password-toggle" type="button" data-password-toggle="registerPassword" aria-label="Show password">Show</button></label>
+          <label class="auth-input"><span aria-hidden="true">☎</span><input name="phone" type="tel" placeholder="Phone (Optional)" maxlength="20" autocomplete="tel" /></label>
+          <button class="refresh-button" type="submit">Create account</button>
+        </form>
+        <button class="auth-switch" id="loginSwitch" type="button">Already have an account? Sign in</button>
+      </div>
+      <p class="auth-error" id="authError" role="alert"></p>
+    </section>
+
+    <main class="page-shell" id="protectedContent" hidden>
       <section class="page-heading">
         <div>
           <p class="eyebrow">Parking availability</p>

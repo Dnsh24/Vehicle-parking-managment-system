@@ -3,7 +3,7 @@
 ## Overview
 
 `database/schema.sql` defines the PostgreSQL database for the project. It
-creates the `pgcrypto` extension, 12 core tables, foreign keys, constraints,
+creates the `pgcrypto` extension, 13 core tables, foreign keys, constraints,
 and explicit indexes inside a transaction. The schema is a database design;
 it does not mean that all related backend services or frontend features are
 implemented.
@@ -27,6 +27,19 @@ Stores accounts and roles.
 | `phone` | `VARCHAR(20)` | Nullable | Phone number |
 | `role` | `VARCHAR(20)` | `NOT NULL`, default `'user'`; `user` or `admin` | Account role |
 | `is_active` | `BOOLEAN` | `NOT NULL`, default `TRUE` | Account status |
+| `created_at` | `TIMESTAMPTZ` | `NOT NULL`, default `CURRENT_TIMESTAMP` | Creation time |
+
+### `auth_sessions`
+
+Stores hashed bearer sessions for authenticated API requests. Raw session
+tokens are returned only to the client and are never stored in PostgreSQL.
+
+| Column | Type | Constraints and default | Purpose |
+| --- | --- | --- | --- |
+| `session_id` | `BIGINT` identity | Primary key | Session identifier |
+| `user_id` | `BIGINT` | `NOT NULL`; FK to `users.user_id`, `ON DELETE CASCADE` | Account |
+| `token_hash` | `CHAR(64)` | `NOT NULL`, `UNIQUE` | SHA-256 token hash |
+| `expires_at` | `TIMESTAMPTZ` | `NOT NULL` | Seven-day expiry |
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL`, default `CURRENT_TIMESTAMP` | Creation time |
 
 ### `vehicles`
@@ -284,6 +297,6 @@ would require reviewing business dependencies and future application rules.
 
 ## Database versus application implementation
 
-These 12 tables document the existing database design only. They do not prove
+These 13 tables document the existing database design only. They do not prove
 that the C++ backend, REST resources, authentication, payment processing, or
 user-facing parking workflows have been implemented.
