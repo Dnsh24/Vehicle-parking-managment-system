@@ -36,20 +36,22 @@ h1, h2, p { margin: 0; } h1 { margin-top: 6px; font-size: clamp(27px, 4vw, 35px)
 .auth-gate { position: relative; display: grid; place-items: center; width: 100%; min-height: 100vh; max-width: none; margin: 0; padding: 50px 7%; background: linear-gradient(90deg, rgba(6, 20, 35, .2), rgba(6, 20, 35, .05)), url("../assets/images/parking-background.png") center / cover no-repeat; }
 .auth-gate::before { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(3, 20, 36, .2), transparent 65%); content: ""; }
 .auth-screen[hidden] { display: none; }
-.auth-screen { position: relative; z-index: 1; width: min(100%, 390px); margin-right: auto; padding: 30px 32px 34px; color: white; background: rgba(9, 43, 72, .84); border: 1px solid rgba(142, 201, 239, .55); border-radius: 17px; box-shadow: 0 18px 45px rgba(0, 12, 25, .35); backdrop-filter: blur(6px); }
+.auth-screen { position: relative; z-index: 1; isolation: isolate; width: min(100%, 390px); margin-right: auto; padding: 30px 32px 34px; color: white; background: #0b2c49; border: 1px solid rgba(142, 201, 239, .55); border-radius: 17px; box-shadow: 0 18px 45px rgba(0, 12, 25, .35); overflow: hidden; }
+.auth-screen::after { position: absolute; inset: 0; z-index: -1; background: rgba(9, 43, 72, .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); content: ""; pointer-events: none; }
 .auth-brand { display: flex; align-items: center; gap: 11px; margin-bottom: 28px; }
 .auth-brand-mark { display: grid; place-items: center; width: 42px; height: 42px; color: #063b57; background: #a8e9f4; border-radius: 50%; font-size: 25px; font-weight: 900; }
 .auth-brand strong, .auth-brand small { display: block; }.auth-brand strong { font-size: 26px; }.auth-brand small { color: #b5d4e7; font-size: 9px; letter-spacing: .05em; }
 .auth-gate h1 { margin: 7px 0; color: #fff; font-size: 38px; }
 .auth-description { margin-bottom: 22px; color: #d7e6f0; font-size: 13px; line-height: 1.45; }
 .auth-form { display: grid; gap: 13px; }
-.auth-input { display: flex !important; align-items: center; gap: 9px; padding: 0 12px; color: #d5edf8 !important; background: rgba(1, 22, 42, .45); border: 1px solid #61c8f5; border-radius: 7px; }
-.auth-input input { min-width: 0; flex: 1; padding: 12px 0; color: white; background: transparent; border: 0; font: inherit; }.auth-input input::placeholder { color: #d4e0e8; }.auth-input input:focus { outline: 0; }
+.auth-input { display: flex !important; align-items: center; gap: 9px; padding: 0 12px; color: #d5edf8 !important; background: #071f35; border: 1px solid #61c8f5; border-radius: 7px; }
+.auth-input input { min-width: 0; flex: 1; padding: 12px 0; color: white; background: transparent; border: 0; font: inherit; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; transform: translateZ(0); }.auth-input input::placeholder { color: #d4e0e8; }.auth-input input:focus { outline: 0; }
+.auth-input:focus-within { border-color: #8fe8f5; box-shadow: 0 0 0 2px rgba(143, 232, 245, .25); }
 .password-toggle { padding: 3px 0 3px 7px; color: #8fe8f5; background: transparent; border: 0; border-left: 1px solid rgba(97, 200, 245, .45); font-size: 11px; font-weight: 700; }
 .auth-input input:-webkit-autofill,
 .auth-input input:-webkit-autofill:hover,
 .auth-input input:-webkit-autofill:focus,
-.auth-input input:-webkit-autofill:active { -webkit-text-fill-color: white; caret-color: white; -webkit-box-shadow: 0 0 0 1000px rgba(1, 22, 42, .45) inset; box-shadow: 0 0 0 1000px rgba(1, 22, 42, .45) inset; transition: background-color 9999s ease-in-out 0s; }
+.auth-input input:-webkit-autofill:active { -webkit-text-fill-color: white; caret-color: white; -webkit-box-shadow: 0 0 0 1000px #071f35 inset; box-shadow: 0 0 0 1000px #071f35 inset; transition: background-color 9999s ease-in-out 0s; }
 .auth-input input[type="tel"] { flex: 1; }
 .auth-options { display: flex; justify-content: space-between; align-items: center; color: #d5e5ef; font-size: 12px; }.forgot-password, .remember-option { color: inherit; background: transparent; border: 0; font-size: inherit; }.forgot-password { color: #37d5e9; }.remember-option { display: flex !important; align-items: center; gap: 5px; font-weight: 400 !important; }.remember-option input { width: 14px; height: 14px; accent-color: #20d9e4; }
 .auth-submit { padding: 12px; color: #032b39; background: #10e4cf; border: 0; border-radius: 6px; box-shadow: 0 7px 16px rgba(0, 234, 220, .3); font-size: 16px; font-weight: 800; }.auth-switch { margin: 18px auto 0; display: block; padding: 0; color: white; background: transparent; border: 0; font-size: 12px; }

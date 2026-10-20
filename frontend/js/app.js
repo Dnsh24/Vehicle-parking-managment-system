@@ -27,16 +27,36 @@ const floorTabs = document.querySelectorAll(".floor-tab");
 
 let areas = [];
 let selectedArea = null;
-function showLoginScreen() {
-    loginScreen.hidden = false;
-    registerScreen.hidden = true;
+function resetPasswordToggles(screen) {
+    screen.querySelectorAll("[data-password-toggle]").forEach((toggle) => {
+        const input = toggle.closest(".auth-input").querySelector("input");
+        if (input) {
+            input.type = "password";
+        }
+        toggle.textContent = "Show";
+        toggle.setAttribute("aria-label", "Show password");
+    });
+}
+
+function showAuthScreen(screenToShow, screenToHide) {
+    screenToHide.hidden = true;
+    void screenToHide.offsetWidth;
+    screenToShow.hidden = false;
+    void screenToShow.offsetWidth;
+    resetPasswordToggles(screenToShow);
     showAuthError("");
+    const firstInput = screenToShow.querySelector("input");
+    if (firstInput) {
+        firstInput.focus({ preventScroll: true });
+    }
+}
+
+function showLoginScreen() {
+    showAuthScreen(loginScreen, registerScreen);
 }
 
 function showRegisterScreen() {
-    loginScreen.hidden = true;
-    registerScreen.hidden = false;
-    showAuthError("");
+    showAuthScreen(registerScreen, loginScreen);
 }
 
 function authHeaders() {
