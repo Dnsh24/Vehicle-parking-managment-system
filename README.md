@@ -8,7 +8,7 @@ frontend, a C++ backend using Crow, and a PostgreSQL database.
 | Component | Status |
 | --- | --- |
 | Frontend | Basic test page implemented. It calls the two backend routes described in [API.md](API.md). |
-| PostgreSQL | Schema implemented with 12 core tables, constraints, and indexes. See [database.md](database.md). |
+| PostgreSQL | Schema implemented with 13 core tables, constraints, and indexes. See [database.md](database.md). |
 | C++ backend | Initial Crow server implemented across `backend/src/`, with centralized configuration and a database helper. It checks PostgreSQL connectivity and exposes two test routes. |
 | REST API | Two test endpoints implemented: `/api/hello` and `/api/database`. Parking-management endpoints are pending. |
 | Frontend-backend integration | Basic integration implemented through browser `fetch` calls to `http://localhost:3000`. |
@@ -43,8 +43,9 @@ HTML/CSS/JavaScript frontend
 ```
 
 Only the basic connectivity path and test routes are currently implemented.
-Authentication, parking reservations, payments, QR processing, and the
-remaining application APIs are planned rather than complete.
+Parking reservations, payments, QR processing, and the remaining application
+APIs are planned rather than complete. Phase 2 authentication and profiles are
+implemented, subject to runtime verification.
 
 ## Implemented features
 
@@ -67,7 +68,7 @@ remaining application APIs are planned rather than complete.
 
 ### Database
 
-- Defines the 12 core tables documented in [database.md](database.md).
+- Defines the 13 core tables documented in [database.md](database.md).
 - Uses `pgcrypto` and `gen_random_uuid()` for QR token generation.
 - Defines primary keys, foreign keys, checks, unique constraints, and indexes.
 
@@ -76,7 +77,6 @@ remaining application APIs are planned rather than complete.
 The following are described in [planning.md](planning.md) but are not yet
 implemented as complete application functionality:
 
-- User registration, authentication, and profiles
 - Vehicle registration and management
 - Parking-area and parking-slot management
 - Availability search and slot allocation
@@ -144,8 +144,15 @@ Create a PostgreSQL database named `parking_management`, then run:
 psql -U <user> -d parking_management -f database/schema.sql
 ```
 
-The schema file creates the `pgcrypto` extension and all 12 tables. Do not put
+The schema file creates the `pgcrypto` extension and all 13 tables. Do not put
 real passwords in documentation or source code.
+
+For an existing database created before Phase 2 authentication, run the
+repeatable migration:
+
+```text
+psql -U <user> -d parking_management -f database/phase2_auth.sql
+```
 
 For local Phase 1 development data, run the repeatable seed script after the
 schema:
@@ -182,6 +189,7 @@ PARKING_DB_PASSWORD=<your-local-password>
 PARKING_SERVER_PORT=3000
 ```
 
+
 On Windows PowerShell, for the current terminal session:
 
 ```powershell
@@ -202,8 +210,8 @@ server port. The backend exits with a configuration error if
 ## Limitations and next steps
 
 The project currently demonstrates the initial frontend/backend/database
-connection only. The next implementation step is to replace the test routes
-with validated application services and REST resources, then connect those
-services to the existing schema. Authentication, authorization, input
-validation, secrets management, and production deployment also remain
+connection and Phase 2 authentication/profile flows. The next implementation
+step is to replace the remaining test routes with validated application
+services and REST resources, then connect those services to the existing
+schema. Input validation, secrets management, and production deployment remain
 necessary before the system can be considered complete.

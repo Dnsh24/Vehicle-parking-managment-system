@@ -23,9 +23,12 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Crow)
 
 find_package(libpqxx CONFIG REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 add_executable(parking_backend
     src/main.cpp
+    src/auth/auth.cpp
+    src/auth/auth.h
     src/api/parking_responses.h
     src/config/config.cpp
     src/database/database.cpp
@@ -36,6 +39,7 @@ target_link_libraries(parking_backend
     PRIVATE
     Crow::Crow
     libpqxx::pqxx
+    OpenSSL::Crypto
 )
 
 if(BUILD_TESTING)
@@ -76,4 +80,16 @@ if(BUILD_TESTING)
     )
 
     add_test(NAME database_tests COMMAND database_tests)
+
+    add_executable(auth_tests
+        tests/auth_tests.cpp
+        src/auth/auth.cpp
+    )
+
+    target_link_libraries(auth_tests
+        PRIVATE
+        OpenSSL::Crypto
+    )
+
+    add_test(NAME auth_tests COMMAND auth_tests)
 endif()

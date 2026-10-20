@@ -1,4 +1,17 @@
 const API_BASE = "http://localhost:3000";
+const authGate = document.getElementById("authGate");
+const protectedContent = document.getElementById("protectedContent");
+const loginScreen = document.getElementById("loginScreen");
+const registerScreen = document.getElementById("registerScreen");
+const loginForm = document.getElementById("loginForm");
+const registerForm = document.getElementById("registerForm");
+const registerSwitch = document.getElementById("registerSwitch");
+const loginSwitch = document.getElementById("loginSwitch");
+const authError = document.getElementById("authError");
+const logoutButton = document.getElementById("logoutButton");
+const topbar = document.getElementById("topbar");
+const forgotPasswordButton = document.getElementById("forgotPasswordButton");
+const passwordToggles = document.querySelectorAll("[data-password-toggle]");
 const selectedSlot = document.getElementById("selectedSlot");
 const selectedStatus = document.getElementById("selectedStatus");
 const selectedVisual = document.getElementById("selectedVisual");
@@ -14,6 +27,126 @@ const floorTabs = document.querySelectorAll(".floor-tab");
 
 let areas = [];
 let selectedArea = null;
+function showLoginScreen() {
+    loginScreen.hidden = false;
+    registerScreen.hidden = true;
+    showAuthError("");
+}
+
+function showRegisterScreen() {
+    loginScreen.hidden = true;
+    registerScreen.hidden = false;
+    showAuthError("");
+}
+
+function authHeaders() {
+    const token = window.localStorage.getItem("parking_auth_token") || window.sessionStorage.getItem("parking_auth_token");
+    return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function showAuthenticatedUser(user) {
+    authGate.setAttribute("hidden", "");
+    protectedContent.removeAttribute("hidden");
+    topbar.hidden = false;
+    logoutButton.textContent = user.name.slice(0, 2).toUpperCase();
+    loadAreas();
+}
+
+function showAuthError(message) {
+    authError.textContent = message;
+}
+
+passwordToggles.forEach((toggle) => {
+    toggle.addEventListener("click", () => {
+        const password = toggle.closest(".auth-input").querySelector("input");
+        const visible = password.type === "text";
+        password.type = visible ? "password" : "text";
+        toggle.textContent = visible ? "Show" : "Hide";
+        toggle.setAttribute("aria-label", visible ? "Show password" : "Hide password");
+    });
+});
+
+async function authenticate(endpoint, form) {
+    showAuthError("");
+    const values = Object.fromEntries(new FormData(form).entries());
+    try {
+        let response;
+        try {
+            response = await fetch(`${API_BASE}${endpoint}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(values)
+            });
+        } catch (error) {
+            throw new Error("Cannot connect to the backend. Start parking_backend on port 3000.");
+        }
+        const responseText = await response.text();
+        let data;
+        try {
+            data = responseText ? JSON.parse(responseText) : {};
+        } catch (error) {
+            throw new Error(`Backend returned an invalid response (${response.status}).`);
+        }
+        if (!response.ok) {
+            throw new Error(data.error?.message || "Authentication failed.");
+        }
+        const rememberMe = form.elements.remember_me?.checked ?? false;
+        const tokenStorage = rememberMe ? window.localStorage : window.sessionStorage;
+        const otherStorage = rememberMe ? window.sessionStorage : window.localStorage;
+        otherStorage.removeItem("parking_auth_token");
+        tokenStorage.setItem("parking_auth_token", data.token);
+        showAuthenticatedUser(data.user);
+    } catch (error) {
+        showAuthError(error.message);
+    }
+}
+
+loginForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    authenticate("/api/auth/login", loginForm);
+});
+
+registerForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    authenticate("/api/auth/register", registerForm);
+});
+
+registerSwitch.addEventListener("click", showRegisterScreen);
+loginSwitch.addEventListener("click", showLoginScreen);
+forgotPasswordButton.addEventListener("click", () => {
+    showAuthError("Password reset is not available yet. Contact an administrator.");
+});
+
+logoutButton.addEventListener("click", async () => {
+    const token = window.localStorage.getItem("parking_auth_token") || window.sessionStorage.getItem("parking_auth_token");
+    if (token) {
+        await fetch(`${API_BASE}/api/auth/logout`, {
+            method: "POST",
+            headers: authHeaders()
+        }).catch(() => {});
+    }
+    window.localStorage.removeItem("parking_auth_token");
+    window.sessionStorage.removeItem("parking_auth_token");
+    window.location.reload();
+});
+
+async function restoreSession() {
+    const token = window.localStorage.getItem("parking_auth_token") || window.sessionStorage.getItem("parking_auth_token");
+    if (!token) {
+        return;
+    }
+    try {
+        const response = await fetch(`${API_BASE}/api/auth/me`, { headers: authHeaders() });
+        const data = await response.json();
+        if (response.ok && data.user) {
+            showAuthenticatedUser(data.user);
+        } else {
+            window.localStorage.removeItem("parking_auth_token");
+        }
+    } catch (error) {
+        showAuthError("The backend could not be reached. Please try again.");
+    }
+}
 
 function statusLabel(status) {
     return status === "available" ? "Available" : status[0].toUpperCase() + status.slice(1);
@@ -215,4 +348,4 @@ document.getElementById("changeAreaButton").addEventListener("click", () => {
     window.alert("Mall Central floors are available in the floor selector.");
 });
 
-loadAreas();
+restoreSession();

@@ -2,8 +2,8 @@
 
 ## Current status
 
-The API now includes the first read-only parking-availability resources.
-Authentication and parking-management write operations are not implemented.
+The API includes authentication, profiles, and read-only
+parking-availability resources.
 
 | Component | Current status |
 | --- | --- |
@@ -11,13 +11,49 @@ Authentication and parking-management write operations are not implemented.
 | REST endpoints | Health endpoints and parking-availability read endpoints implemented |
 | PostgreSQL through C++ | Connectivity check implemented |
 | Frontend API integration | Implemented for the two test endpoints |
-| Authentication and authorization | Not implemented |
+| Authentication and authorization | Implemented with bearer sessions |
 | Parking resources | Not implemented |
 
 The database tables are not API resources until backend routes and operations
 are implemented for them.
 
 ## Implemented endpoints
+
+### `POST /api/auth/register`
+
+Creates a user account and returns a seven-day bearer token. The JSON body
+requires separate `username`, `email`, and password fields; the password must
+be at least eight characters. `phone` is optional. Duplicate usernames or
+emails return `409 ACCOUNT_IDENTIFIER_ALREADY_REGISTERED`.
+
+### `POST /api/auth/login`
+
+Accepts a username or email in the `email` field plus `password`, and returns
+a bearer token and user profile.
+Invalid credentials and inactive accounts return `401 INVALID_CREDENTIALS`.
+
+### `POST /api/auth/logout`
+
+Invalidates the bearer token supplied in the `Authorization: Bearer <token>`
+header.
+
+### `GET /api/auth/me`
+
+Returns the authenticated user. Requests without a valid bearer token return
+`401 UNAUTHENTICATED`.
+
+### `GET /api/profile`
+
+Returns the authenticated user's profile.
+
+### `PUT /api/profile`
+
+Updates the authenticated user's `name` and optional `phone`.
+
+### `PUT /api/profile/password`
+
+Updates the authenticated user's password. The JSON body requires
+`current_password` and a `new_password` of at least eight characters.
 
 ### `GET /api/hello`
 
@@ -128,7 +164,6 @@ connection error when the backend cannot be reached.
 
 The following areas are planned, not implemented:
 
-- Authentication and user management
 - Vehicle management
 - Parking-area, slot, and rate management writes
 - Availability and reservation operations

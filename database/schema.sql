@@ -1,6 +1,6 @@
 -- Vehicle Parking Management System
 -- PostgreSQL database schema
--- 12 core tables
+-- 13 core tables
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 BEGIN;
 
@@ -10,6 +10,7 @@ BEGIN;
 
 CREATE TABLE users (
     user_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
     name VARCHAR(100) NOT NULL,
     email VARCHAR(255) NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
@@ -21,6 +22,22 @@ CREATE TABLE users (
     CONSTRAINT users_role_check
         CHECK (role IN ('user', 'admin'))
 );
+
+CREATE TABLE auth_sessions (
+    session_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_auth_sessions_user
+        FOREIGN KEY (user_id)
+        REFERENCES users(user_id)
+        ON DELETE CASCADE
+);
+
+CREATE INDEX auth_sessions_token_lookup
+    ON auth_sessions(token_hash);
 
 -- ============================================================
 -- 2. VEHICLES

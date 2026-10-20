@@ -15,11 +15,13 @@
 - Foundation runtime verification, health checks, and CORS verification
 - `GET /api/hello`
 - `GET /api/database`
-- PostgreSQL schema with 12 core tables, constraints, and indexes
+- Phase 1 parking availability: database-backed areas and slots load in the
+  frontend
+- Phase 2 authentication: registration, login, logout, sessions, and profiles
+- PostgreSQL schema with 13 core tables, constraints, and indexes
 
 ### In progress
 
-- Frontend-to-backend integration beyond the health-check page
 - Application-specific backend and integration testing
 
 ### Planned
@@ -50,8 +52,8 @@ The technology stack is:
 Users should be able to register, log in, log out, manage profiles, change
 passwords, and view their registered vehicles.
 
-**Status:** Planned. The `users` table exists, but authentication is not
-implemented.
+**Status:** Backend and frontend authentication/profile flows implemented;
+runtime verification and end-to-end error-path testing remain.
 
 ### Vehicles
 
@@ -274,14 +276,14 @@ advanced reporting.
 
 #### Phase 1: Parking availability
 
-**Status:** Backend endpoints and frontend API integration implemented;
-database-backed runtime verification remains.
+**Status:** Completed. Backend endpoints, frontend API integration, and
+database-backed runtime verification are working with seeded parking slots.
 
 - Backend: query areas and slots and expose read-only REST endpoints.
 - Frontend: load areas and slots from the API, select a floor, and show slot
   states with loading, empty, error, and retry states.
-- Backend response-shape tests are implemented. Runtime tests still need a
-  PostgreSQL instance seeded with the three mall floors.
+- Backend response-shape tests are implemented, and the seeded three-floor
+  PostgreSQL data loads successfully in the frontend.
 - Test invalid areas, empty areas, database failures, occupied slots, and
   maintenance slots against the running database.
 
@@ -289,6 +291,9 @@ References: `parking_areas`, `parking_slots`, and `maintenance` in
 [database.md](database.md).
 
 #### Phase 2: Authentication and profiles
+
+**Status:** Backend and frontend flows implemented; runtime verification and
+end-to-end error-path testing remain.
 
 - Backend: registration, login, logout, password hashing, authorization, and
   profile operations.
