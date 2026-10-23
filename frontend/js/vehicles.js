@@ -431,14 +431,13 @@ async function showVehicleExitModal(vehicleId) {
         paymentSec.className = "exit-payment-section";
         const label = document.createElement("label");
         label.htmlFor = "exitPaymentActionSelect";
-        label.textContent = "Payment Status";
+        label.textContent = "Payment Option";
 
         const select = document.createElement("select");
         select.id = "exitPaymentActionSelect";
         select.innerHTML = `
-            <option value="paid_manually">Paid at counter (Cash)</option>
-            <option value="unpaid">Leave Unpaid</option>
-            <option value="waived">Waive Fee</option>
+            <option value="payment_at_desk">Payment at desk</option>
+            <option value="online_payment">Online payment</option>
         `;
         paymentSec.append(label, select);
         exitModalBody.append(paymentSec);

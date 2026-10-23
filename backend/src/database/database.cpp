@@ -527,7 +527,7 @@ SessionExitResult Database::exitParkingSession(
 
     const std::string final_session_status = (overstay_duration_minutes > 0) ? "overstayed" : "completed";
 
-    std::string payment_status = "paid_manually";
+    std::string payment_status = (payment_action == "online_payment") ? "online_payment" : "payment_at_desk";
     if (payment_action == "unpaid")
     {
         payment_status = "unpaid";
@@ -573,10 +573,10 @@ SessionExitResult Database::exitParkingSession(
         slot_id);
 
     std::string payment_db_status = "successful";
-    std::string payment_method = "CASH";
+    std::string payment_method = (payment_status == "online_payment") ? "UPI" : "CASH";
     double payment_amount = total_fee;
     std::string paid_at_val = exit_time_str;
-    std::string tx_ref = "MANUAL-" + std::to_string(session_id) + "-" + std::to_string(duration_minutes);
+    std::string tx_ref = (payment_status == "online_payment" ? "ONLINE-" : "DESK-") + std::to_string(session_id) + "-" + std::to_string(duration_minutes);
 
     if (payment_status == "unpaid")
     {

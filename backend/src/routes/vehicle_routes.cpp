@@ -332,7 +332,7 @@ void registerVehicleRoutes(crow::App<crow::CORSHandler> &app, Database &database
                 return unauthorized();
             }
 
-            std::string payment_action = "paid_manually";
+            std::string payment_action = "payment_at_desk";
             if (!request.body.empty())
             {
                 const auto body = crow::json::load(request.body);
