@@ -173,3 +173,131 @@ h1, h2, p { margin: 0; } h1 { margin-top: 6px; font-size: clamp(27px, 4vw, 35px)
 .admin-mode-active .auth-submit { background: #a855f7 !important; color: white !important; box-shadow: 0 7px 16px rgba(168, 85, 247, 0.35) !important; }
 .admin-badge-indicator { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: rgba(168, 85, 247, 0.2); border: 1px solid rgba(168, 85, 247, 0.5); border-radius: 6px; color: #d8b4fe; font-size: 11px; font-weight: 700; margin-bottom: 12px; }
 .admin-badge-indicator[hidden] { display: none !important; }
+/* Session Exit Modal Dialog */
+dialog.exit-modal {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0;
+  max-width: 520px;
+  width: 92%;
+  box-shadow: 0 16px 45px rgba(23, 33, 43, 0.25);
+  margin: auto;
+}
+
+dialog.exit-modal::backdrop {
+  background: rgba(11, 44, 73, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.exit-modal-content {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.exit-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.exit-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.exit-modal-close {
+  background: transparent;
+  border: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.exit-modal-close:hover {
+  background: var(--gray-soft);
+  color: var(--ink);
+}
+
+.fee-breakdown-card {
+  background: #f8fafb;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.fee-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.fee-breakdown-row.total {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--green);
+}
+
+.fee-overstay-warning {
+  color: #d97706;
+  background: #fef3c7;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.exit-payment-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.exit-payment-section label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.exit-payment-section select {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  font: inherit;
+  font-size: 13px;
+  background: white;
+}
+
+.exit-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
