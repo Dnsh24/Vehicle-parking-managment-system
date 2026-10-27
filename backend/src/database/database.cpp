@@ -1,8 +1,11 @@
 #include "database.h"
+#include "parking_fees.h"
 
+#include <cmath>
 #include <exception>
 #include <string>
 #include <algorithm>
+#include <stdexcept>
 
 namespace
 {
@@ -130,6 +133,111 @@ VehicleDeletionResult Database::deleteVehicleAndHistory(
         user_id);
     transaction.commit();
     return VehicleDeletionResult::deleted;
+}
+
+UserDeletionResult Database::deleteUserWithoutFutureActivity(std::int64_t user_id) const
+{
+    pqxx::connection connection = createConnection();
+    pqxx::work transaction(connection);
+
+    const pqxx::result user = transaction.exec_params(
+        "SELECT user_id FROM users WHERE user_id = $1 FOR UPDATE",
+        user_id);
+    if (user.empty())
+    {
+        return UserDeletionResult::not_found;
+    }
+
+    transaction.exec_params(
+        "SELECT vehicle_id FROM vehicles WHERE user_id = $1 FOR UPDATE",
+        user_id);
+
+    const pqxx::result future_reservation = transaction.exec_params(
+        "SELECT EXISTS ("
+        "SELECT 1 FROM reservations r "
+        "WHERE (r.user_id = $1 OR r.vehicle_id IN "
+        "(SELECT vehicle_id FROM vehicles WHERE user_id = $1)) "
+        "AND r.status IN ('pending', 'confirmed') "
+        "AND r.start_time > CURRENT_TIMESTAMP) AS has_future_reservation",
+        user_id);
+    if (future_reservation[0]["has_future_reservation"].as<bool>())
+    {
+        return UserDeletionResult::future_reservation;
+    }
+
+    const pqxx::result active_activity = transaction.exec_params(
+        "SELECT EXISTS ("
+        "SELECT 1 FROM reservations r "
+        "WHERE (r.user_id = $1 OR r.vehicle_id IN "
+        "(SELECT vehicle_id FROM vehicles WHERE user_id = $1)) "
+        "AND (r.status = 'active' OR "
+        "(r.status IN ('pending', 'confirmed') "
+        "AND r.start_time <= CURRENT_TIMESTAMP AND r.end_time > CURRENT_TIMESTAMP))) "
+        "OR EXISTS ("
+        "SELECT 1 FROM parking_sessions ps "
+        "WHERE (ps.user_id = $1 OR ps.vehicle_id IN "
+        "(SELECT vehicle_id FROM vehicles WHERE user_id = $1)) "
+        "AND ps.status IN ('active', 'overstayed') AND ps.exit_time IS NULL) "
+        "OR EXISTS ("
+        "SELECT 1 FROM parking_assignments pa "
+        "WHERE (pa.user_id = $1 OR pa.vehicle_id IN "
+        "(SELECT vehicle_id FROM vehicles WHERE user_id = $1)) "
+        "AND pa.checkout_at IS NULL) AS has_active_activity",
+        user_id);
+    if (active_activity[0]["has_active_activity"].as<bool>())
+    {
+        return UserDeletionResult::active_activity;
+    }
+
+    transaction.exec_params(
+        "DELETE FROM receipts "
+        "WHERE reservation_id IN ("
+        "SELECT reservation_id FROM reservations "
+        "WHERE user_id = $1 OR vehicle_id IN "
+        "(SELECT vehicle_id FROM vehicles WHERE user_id = $1)) "
+        "OR session_id IN ("
+        "SELECT session_id FROM parking_sessions "
+        "WHERE user_id = $1 OR vehicle_id IN "
+        "(SELECT vehicle_id FROM vehicles WHERE user_id = $1))",
+        user_id);
+    transaction.exec_params(
+        "DELETE FROM payments "
+        "WHERE user_id = $1 "
+        "OR reservation_id IN ("
+        "SELECT reservation_id FROM reservations "
+        "WHERE user_id = $1 OR vehicle_id IN "
+        "(SELECT vehicle_id FROM vehicles WHERE user_id = $1)) "
+        "OR session_id IN ("
+        "SELECT session_id FROM parking_sessions "
+        "WHERE user_id = $1 OR vehicle_id IN "
+        "(SELECT vehicle_id FROM vehicles WHERE user_id = $1))",
+        user_id);
+    transaction.exec_params(
+        "DELETE FROM parking_assignments "
+        "WHERE user_id = $1 OR vehicle_id IN "
+        "(SELECT vehicle_id FROM vehicles WHERE user_id = $1)",
+        user_id);
+    transaction.exec_params(
+        "DELETE FROM parking_sessions "
+        "WHERE user_id = $1 OR vehicle_id IN "
+        "(SELECT vehicle_id FROM vehicles WHERE user_id = $1) "
+        "OR reservation_id IN ("
+        "SELECT reservation_id FROM reservations WHERE user_id = $1)",
+        user_id);
+    transaction.exec_params(
+        "DELETE FROM reservations "
+        "WHERE user_id = $1 OR vehicle_id IN "
+        "(SELECT vehicle_id FROM vehicles WHERE user_id = $1)",
+        user_id);
+    transaction.exec_params(
+        "DELETE FROM vehicles WHERE user_id = $1",
+        user_id);
+    transaction.exec_params(
+        "DELETE FROM users WHERE user_id = $1",
+        user_id);
+
+    transaction.commit();
+    return UserDeletionResult::deleted;
 }
 
 ReservationCreationResult Database::createReservation(
@@ -426,8 +534,14 @@ ReservationCancellationStatus Database::cancelReservation(
 VehicleParkingResult Database::parkVehicle(
     std::int64_t user_id,
     std::int64_t vehicle_id,
-    std::int64_t slot_id) const
+    std::int64_t slot_id,
+    int planned_duration_minutes) const
 {
+    if (planned_duration_minutes <= 0 || planned_duration_minutes > 10080)
+    {
+        throw std::invalid_argument("Planned parking duration must be between 1 and 10080 minutes.");
+    }
+
     pqxx::connection connection = createConnection();
     pqxx::work transaction(connection);
 
@@ -489,13 +603,15 @@ VehicleParkingResult Database::parkVehicle(
         "UPDATE parking_slots SET status = 'occupied' WHERE slot_id = $1",
         slot_id);
     const pqxx::result assignment = transaction.exec_params(
-        "INSERT INTO parking_assignments (user_id, vehicle_id, slot_id) "
-        "VALUES ($1, $2, $3) "
+        "INSERT INTO parking_assignments (user_id, vehicle_id, slot_id, scheduled_end) "
+        "VALUES ($1, $2, $3, clock_timestamp() + make_interval(mins => $4)) "
         "RETURNING assignment_id, to_char(parked_at AT TIME ZONE 'UTC', "
-        "'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS parked_at",
+        "'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS parked_at, "
+        "to_char(scheduled_end AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS scheduled_end",
         user_id,
         vehicle_id,
-        slot_id);
+        slot_id,
+        planned_duration_minutes);
     transaction.commit();
     return {
         VehicleParkingStatus::parked,
@@ -504,7 +620,8 @@ VehicleParkingResult Database::parkVehicle(
         slot[0]["area_id"].as<std::int64_t>(),
         slot[0]["slot_number"].as<std::string>(),
         slot[0]["area_name"].as<std::string>(),
-        assignment[0]["parked_at"].as<std::string>()};
+        assignment[0]["parked_at"].as<std::string>(),
+        assignment[0]["scheduled_end"].as<std::string>()};
 }
 SessionExitResult Database::exitParkingSession(
     std::int64_t user_id,
@@ -518,14 +635,16 @@ SessionExitResult Database::exitParkingSession(
         "SELECT s.session_id, s.reservation_id, s.user_id, s.vehicle_id, s.slot_id, "
         "s.status AS session_status, s.exit_time, "
         "s.entry_time, "
+        "r.start_time AS reserved_start_time, "
         "r.end_time AS reserved_end_time, "
+        "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (r.end_time - r.start_time)) / 60.0)::INTEGER) "
+        "AS booked_duration_minutes, "
         "to_char(s.entry_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS entry_time_str, "
         "to_char(r.end_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS reserved_end_time_str, "
         "v.registration_number, v.vehicle_type, "
         "ps.slot_number, ps.slot_type, ps.area_id, "
         "pa.name AS area_name, pa.location, "
-        "COALESCE(pr.hourly_rate, 40.00) AS hourly_rate, "
-        "COALESCE(pr.overstay_rate, 60.00) AS overstay_rate "
+        "COALESCE(pr.hourly_rate, 40.00) AS hourly_rate "
         "FROM parking_sessions s "
         "JOIN reservations r ON r.reservation_id = s.reservation_id "
         "JOIN vehicles v ON v.vehicle_id = s.vehicle_id "
@@ -551,32 +670,30 @@ SessionExitResult Database::exitParkingSession(
     }
 
     const pqxx::result calc_rows = transaction.exec_params(
+        "WITH times AS (SELECT clock_timestamp() AS now) "
         "SELECT "
-        "clock_timestamp() AS exit_time_raw, "
-        "to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS exit_time_str, "
-        "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (clock_timestamp() - $1::timestamptz)) / 60.0)::INTEGER) AS duration_minutes, "
-        "CASE "
-        "    WHEN clock_timestamp() > $2::timestamptz THEN "
-        "        CEIL(EXTRACT(EPOCH FROM (clock_timestamp() - $2::timestamptz)) / 60.0)::INTEGER "
-        "    ELSE 0 "
-        "END AS overstay_duration_minutes",
+        "to_char(times.now AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS exit_time_str, "
+        "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (times.now - $1::timestamptz)) / 60.0)::INTEGER) AS duration_minutes, "
+        "GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (times.now - $2::timestamptz - "
+        "make_interval(mins => $3)))::INTEGER)) AS overtime_duration_seconds "
+        "FROM times",
         row["entry_time"].as<std::string>(),
-        row["reserved_end_time"].as<std::string>());
+        row["reserved_end_time"].as<std::string>(),
+        parking::fees::free_buffer_minutes);
 
     const auto &calc = calc_rows[0];
     const std::string exit_time_str = calc["exit_time_str"].as<std::string>();
     const int duration_minutes = calc["duration_minutes"].as<int>();
-    const int overstay_duration_minutes = calc["overstay_duration_minutes"].as<int>();
-
-    const int billed_hours = std::max(1, (duration_minutes + 59) / 60);
-    const int billed_overstay_hours = overstay_duration_minutes > 0 ? (overstay_duration_minutes + 59) / 60 : 0;
-
+    const int overtime_duration_seconds = calc["overtime_duration_seconds"].as<int>();
+    const int overstay_duration_minutes = (overtime_duration_seconds + 59) / 60;
     const double hourly_rate = row["hourly_rate"].as<double>();
-    const double overstay_rate = row["overstay_rate"].as<double>();
-
-    const double base_fee = billed_hours * hourly_rate;
-    const double overstay_fee = billed_overstay_hours * overstay_rate;
-    const double total_fee = base_fee + overstay_fee;
+    const int booked_duration_minutes = std::max(
+        1,
+        row["booked_duration_minutes"].as<int>());
+    const parking::fees::Breakdown fee = parking::fees::calculate(
+        booked_duration_minutes,
+        overtime_duration_seconds,
+        hourly_rate);
 
     const std::string final_session_status = (overstay_duration_minutes > 0) ? "overstayed" : "completed";
 
@@ -601,7 +718,7 @@ SessionExitResult Database::exitParkingSession(
         exit_time_str,
         duration_minutes,
         overstay_duration_minutes,
-        total_fee,
+        fee.total_fee,
         final_session_status,
         session_id);
 
@@ -627,7 +744,7 @@ SessionExitResult Database::exitParkingSession(
 
     std::string payment_db_status = "successful";
     std::string payment_method = (payment_status == "online_payment") ? "UPI" : "CASH";
-    double payment_amount = total_fee;
+    double payment_amount = fee.total_fee;
     std::string paid_at_val = exit_time_str;
     std::string tx_ref = (payment_status == "online_payment" ? "ONLINE-" : "DESK-") + std::to_string(session_id) + "-" + std::to_string(duration_minutes);
 
@@ -681,7 +798,7 @@ SessionExitResult Database::exitParkingSession(
         "'exit')",
         user_id,
         session_id,
-        total_fee);
+        fee.total_fee);
     if (overstay_duration_minutes > 0)
     {
         transaction.exec_params(
@@ -717,14 +834,15 @@ SessionExitResult Database::exitParkingSession(
     summary.exit_time = exit_time_str;
     summary.reserved_end_time = row["reserved_end_time_str"].as<std::string>();
     summary.duration_minutes = duration_minutes;
-    summary.billed_hours = billed_hours;
-    summary.overstay_duration_minutes = overstay_duration_minutes;
-    summary.billed_overstay_hours = billed_overstay_hours;
+    summary.billed_hours = fee.billed_hours;
+    summary.billed_overtime_minutes = fee.billed_overtime_minutes;
+    summary.overtime_duration_seconds = overtime_duration_seconds;
+    summary.grace_buffer_minutes = parking::fees::free_buffer_minutes;
     summary.hourly_rate = hourly_rate;
-    summary.overstay_rate = overstay_rate;
-    summary.base_fee = base_fee;
-    summary.overstay_fee = overstay_fee;
-    summary.total_fee = total_fee;
+    summary.overtime_rate_per_minute = parking::fees::overtime_rate_per_minute;
+    summary.base_fee = fee.base_fee;
+    summary.overstay_fee = fee.overtime_fee;
+    summary.total_fee = fee.total_fee;
     summary.payment_status = payment_status;
     summary.session_status = final_session_status;
 
@@ -745,12 +863,15 @@ std::optional<api::SessionFeeSummaryData> Database::getSessionFeeSummary(
         "to_char(s.entry_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS entry_time_str, "
         "to_char(s.exit_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS exit_time_str, "
         "to_char(r.end_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS reserved_end_time_str, "
+        "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (r.end_time - r.start_time)) / 60.0)::INTEGER) "
+        "AS booked_duration_minutes, "
+        "CASE WHEN s.exit_time IS NULL THEN 0 ELSE GREATEST(0, FLOOR(EXTRACT(EPOCH FROM "
+        "(s.exit_time - r.end_time - INTERVAL '7 minutes')))::INTEGER) END AS overtime_duration_seconds, "
         "s.entry_time, s.exit_time, r.end_time AS reserved_end_time, "
         "v.registration_number, v.vehicle_type, "
         "ps.slot_number, ps.slot_type, ps.area_id, "
         "pa.name AS area_name, pa.location, "
         "COALESCE(pr.hourly_rate, 40.00) AS hourly_rate, "
-        "COALESCE(pr.overstay_rate, 60.00) AS overstay_rate, "
         "p.status AS payment_db_status, p.payment_method "
         "FROM parking_sessions s "
         "JOIN reservations r ON r.reservation_id = s.reservation_id "
@@ -783,19 +904,25 @@ std::optional<api::SessionFeeSummaryData> Database::getSessionFeeSummary(
     summary.entry_time = row["entry_time_str"].as<std::string>();
     summary.reserved_end_time = row["reserved_end_time_str"].as<std::string>();
     summary.hourly_rate = row["hourly_rate"].as<double>();
-    summary.overstay_rate = row["overstay_rate"].as<double>();
+    summary.overtime_rate_per_minute = parking::fees::overtime_rate_per_minute;
+    summary.grace_buffer_minutes = parking::fees::free_buffer_minutes;
+    const int booked_duration_minutes = row["booked_duration_minutes"].as<int>();
 
     if (!row["exit_time"].is_null())
     {
         summary.exit_time = row["exit_time_str"].as<std::string>();
         summary.duration_minutes = row["duration_minutes"].as<int>();
-        summary.overstay_duration_minutes = row["overstay_duration_minutes"].as<int>();
+        summary.overtime_duration_seconds = row["overtime_duration_seconds"].as<int>();
         summary.total_fee = row["calculated_fee"].as<double>();
         summary.session_status = row["session_status"].as<std::string>();
-        summary.billed_hours = std::max(1, (summary.duration_minutes + 59) / 60);
-        summary.billed_overstay_hours = summary.overstay_duration_minutes > 0 ? (summary.overstay_duration_minutes + 59) / 60 : 0;
-        summary.base_fee = summary.billed_hours * summary.hourly_rate;
-        summary.overstay_fee = summary.billed_overstay_hours * summary.overstay_rate;
+        const parking::fees::Breakdown fee = parking::fees::calculate(
+            booked_duration_minutes,
+            summary.overtime_duration_seconds,
+            summary.hourly_rate);
+        summary.billed_hours = fee.billed_hours;
+        summary.billed_overtime_minutes = fee.billed_overtime_minutes;
+        summary.base_fee = fee.base_fee;
+        summary.overstay_fee = fee.overtime_fee;
 
         if (!row["payment_db_status"].is_null())
         {
@@ -822,26 +949,29 @@ std::optional<api::SessionFeeSummaryData> Database::getSessionFeeSummary(
     else
     {
         const pqxx::result calc_rows = transaction.exec_params(
+            "WITH times AS (SELECT clock_timestamp() AS now) "
             "SELECT "
-            "to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS exit_time_str, "
-            "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (clock_timestamp() - $1::timestamptz)) / 60.0)::INTEGER) AS duration_minutes, "
-            "CASE "
-            "    WHEN clock_timestamp() > $2::timestamptz THEN "
-            "        CEIL(EXTRACT(EPOCH FROM (clock_timestamp() - $2::timestamptz)) / 60.0)::INTEGER "
-            "    ELSE 0 "
-            "END AS overstay_duration_minutes",
+            "to_char(times.now AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS exit_time_str, "
+            "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (times.now - $1::timestamptz)) / 60.0)::INTEGER) AS duration_minutes, "
+            "GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (times.now - $2::timestamptz - "
+            "INTERVAL '7 minutes')))::INTEGER) AS overtime_duration_seconds "
+            "FROM times",
             row["entry_time"].as<std::string>(),
             row["reserved_end_time"].as<std::string>());
 
         const auto &calc = calc_rows[0];
         summary.exit_time = calc["exit_time_str"].as<std::string>();
         summary.duration_minutes = calc["duration_minutes"].as<int>();
-        summary.overstay_duration_minutes = calc["overstay_duration_minutes"].as<int>();
-        summary.billed_hours = std::max(1, (summary.duration_minutes + 59) / 60);
-        summary.billed_overstay_hours = summary.overstay_duration_minutes > 0 ? (summary.overstay_duration_minutes + 59) / 60 : 0;
-        summary.base_fee = summary.billed_hours * summary.hourly_rate;
-        summary.overstay_fee = summary.billed_overstay_hours * summary.overstay_rate;
-        summary.total_fee = summary.base_fee + summary.overstay_fee;
+        summary.overtime_duration_seconds = calc["overtime_duration_seconds"].as<int>();
+        const parking::fees::Breakdown fee = parking::fees::calculate(
+            booked_duration_minutes,
+            summary.overtime_duration_seconds,
+            summary.hourly_rate);
+        summary.billed_hours = fee.billed_hours;
+        summary.billed_overtime_minutes = fee.billed_overtime_minutes;
+        summary.base_fee = fee.base_fee;
+        summary.overstay_fee = fee.overtime_fee;
+        summary.total_fee = fee.total_fee;
         summary.session_status = row["session_status"].as<std::string>();
         summary.payment_status = "unpaid";
     }

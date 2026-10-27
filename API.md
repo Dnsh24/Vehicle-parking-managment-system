@@ -112,8 +112,12 @@ slots. A vehicle that is already parked returns `409 VEHICLE_ALREADY_PARKED`.
 ### `POST /api/vehicles/{vehicle_id}/park`
 
 Assigns the owner's vehicle to an available compatible slot. The JSON body
-requires a positive `slot_id`. The operation atomically marks the slot
-occupied and records the active assignment. EV charging slots require the
+requires a positive `slot_id` and a whole-number `duration_minutes` from 1
+through 10080. The operation atomically marks the slot occupied and records its
+planned end time. Immediate parking charges for the full planned duration,
+rounded up to whole hourly-rate units, even if the vehicle leaves early. The
+first 7 minutes after the planned end are free; after that, overtime costs INR 1
+per minute, rounding any started minute up to a full minute. EV charging slots require the
 vehicle to be marked electric. Handicapped slots require
 `needs_accessible_parking` to be true for the vehicle. A slot that is no longer
 available, is inactive, or is incompatible returns `409
@@ -124,14 +128,16 @@ not eligible for direct parking, so a future reservation cannot be displaced
 by a manual assignment.
 
 The response contains a `parking` object with the assignment, vehicle, slot,
-area, and parking start time. An active slot remains occupied until checkout.
-This direct assignment tracks occupancy only; it does not create a reservation
-or a billable `parking_session`.
+area, parking start time, and planned `scheduled_end`. An active slot remains
+occupied until checkout.
 
 ### `POST /api/vehicles/{vehicle_id}/checkout`
 
 Checks out the owner's vehicle, records the checkout time, and releases its
-slot back to `available`. A vehicle without an active assignment returns `404
+slot back to `available`. For an immediate parking assignment, checkout charges
+the planned stay at the slot's hourly rate, rounded up to whole hours, plus
+seven free minutes after the planned end and INR 1 for each started minute
+after the grace period. A vehicle without an active assignment returns `404
 ACTIVE_PARKING_NOT_FOUND`.
 
 `GET /api/vehicles` includes the active assignment as `parking` when the
@@ -170,7 +176,8 @@ Slots must be active, available, vehicle-compatible, and free of active
 parking or overlapping pending, confirmed, or active reservations. Time
 intervals use half-open boundaries, so one reservation may start exactly when
 another ends. Scheduled or in-progress maintenance is excluded for the
-requested interval. Requests for another user's vehicle return no results.
+requested interval. Results include an hourly rate, defaulting to INR 40 when no matching
+rate is configured. Requests for another user's vehicle return no results.
 
 ### `POST /api/reservations`
 
@@ -184,7 +191,11 @@ The operation also rejects slots with scheduled or in-progress maintenance
 during any part of the requested interval.
 
 Returns `201 Created` with a `reservation` object containing its ID, vehicle,
-slot, area, time range, status, and configured hourly rate when available.
+slot, area, time range, status, and hourly rate. At checkout, reservations are
+charged for the full booked time range, rounded up to whole hourly-rate units,
+even if the vehicle leaves early. The first 7 minutes after the booked end are
+free; after that, overtime costs INR 1 per minute, rounding any started minute
+up to a full minute.
 Invalid timestamps return `400 INVALID_TIME_RANGE`; an unknown or unowned
 vehicle returns `404 VEHICLE_NOT_FOUND`; a vehicle or slot conflict returns
 `409 VEHICLE_UNAVAILABLE` or `409 PARKING_SLOT_UNAVAILABLE`.
@@ -208,6 +219,8 @@ reservation active, and marks the slot occupied. Check-in is available from
 the reservation start time up to (but not including) its end time. Slots or
 areas that are unavailable, or slots with maintenance overlapping the
 remaining reservation time, cannot be checked into.
+The client confirms the full booked-slot charge and overtime rule before
+submitting check-in.
 
 Returns `201 Created` with a `session` containing the session, vehicle, slot,
 area, entry time, and reservation end time. Unknown or unowned reservations
@@ -258,8 +271,10 @@ Marks all of the authenticated user's notifications as read and returns
 
 Returns the real-time fee breakdown or completed settlement details for the
 specified parking session owned by the authenticated user. If the session is
-active, it calculates the live elapsed duration, hourly rate, overstay duration
-(if actual time exceeds reserved end time), and total fee preview. Also accessible
+active, it calculates the live elapsed duration, full booked-slot charge,
+7-minute free buffer, overtime after the buffer at INR 1 per started minute,
+and total fee preview.
+Also accessible
 via `GET /api/parking-sessions/{session_id}`.
 
 Example response:
@@ -280,10 +295,11 @@ Example response:
     "reserved_end_time": "2026-10-23T08:35:08Z",
     "duration_minutes": 45,
     "billed_hours": 1,
-    "overstay_duration_minutes": 0,
-    "billed_overstay_hours": 0,
+    "billed_overtime_minutes": 0,
+    "overtime_duration_seconds": 0,
+    "grace_buffer_minutes": 7,
     "hourly_rate": 40.00,
-    "overstay_rate": 60.00,
+    "overtime_rate_per_minute": 1.00,
     "base_fee": 40.00,
     "overstay_fee": 0.00,
     "total_fee": 40.00,
@@ -452,6 +468,16 @@ from changing their own role (`400 CANNOT_MODIFY_OWN_ADMIN_ACCESS`).
 
 Updates a user's `is_active` status. Inactive accounts cannot log in. Administrators
 are prevented from deactivating their own account (`400 CANNOT_MODIFY_OWN_ADMIN_ACCESS`).
+
+### `DELETE /api/admin/users/{user_id}`
+
+Permanently deletes a user or administrator account and its dependent account data.
+Administrators cannot delete their own account (`400 CANNOT_MODIFY_OWN_ADMIN_ACCESS`).
+Past reservations, parking sessions, assignments, payments, and receipts are deleted
+with the account. Deletion is rejected with `409 USER_HAS_FUTURE_RESERVATION` if
+the account has a future pending or confirmed reservation, or with
+`409 USER_HAS_ACTIVE_ACTIVITY` if it has an active reservation or parking session.
+Returns `404 USER_NOT_FOUND` if the account does not exist.
 
 ### `GET /api/admin/parking-areas`
 

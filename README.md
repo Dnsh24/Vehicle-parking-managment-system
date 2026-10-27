@@ -189,6 +189,17 @@ This migration defaults existing vehicles to not requiring accessible parking.
 Vehicles marked as requiring accessible parking may use handicapped slots;
 other vehicles are not offered those slots.
 
+For an existing database, add the planned stay end time used by immediate
+parking and overtime billing before starting the updated backend:
+
+```text
+psql -U <user> -d parking_management -f database/overtime.sql
+```
+
+The migration backfills existing parking assignments using their elapsed
+whole-hour duration. New immediate parking requests must include a planned
+stay duration.
+
 For local Phase 1 development data, run the repeatable seed script after the
 schema:
 

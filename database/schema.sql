@@ -133,6 +133,7 @@ CREATE TABLE parking_assignments (
     vehicle_id BIGINT NOT NULL,
     slot_id BIGINT NOT NULL,
     parked_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    scheduled_end TIMESTAMPTZ NOT NULL,
     checkout_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -152,7 +153,10 @@ CREATE TABLE parking_assignments (
         ON DELETE RESTRICT,
 
     CONSTRAINT parking_assignments_checkout_check
-        CHECK (checkout_at IS NULL OR checkout_at >= parked_at)
+        CHECK (checkout_at IS NULL OR checkout_at >= parked_at),
+
+    CONSTRAINT parking_assignments_scheduled_end_check
+        CHECK (scheduled_end > parked_at)
 );
 
 CREATE UNIQUE INDEX parking_assignments_active_vehicle

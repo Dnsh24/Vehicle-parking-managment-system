@@ -133,4 +133,10 @@ if(BUILD_TESTING)
     endif()
 
     add_test(NAME admin_tests COMMAND admin_tests)
+
+    add_executable(parking_fee_tests
+        tests/parking_fee_tests.cpp
+    )
+
+    add_test(NAME parking_fee_tests COMMAND parking_fee_tests)
 endif()

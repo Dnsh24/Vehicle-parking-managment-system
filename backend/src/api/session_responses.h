@@ -23,10 +23,11 @@ struct SessionFeeSummaryData
     std::string reserved_end_time;
     int duration_minutes = 0;
     int billed_hours = 0;
-    int overstay_duration_minutes = 0;
-    int billed_overstay_hours = 0;
+    int billed_overtime_minutes = 0;
+    int overtime_duration_seconds = 0;
+    int grace_buffer_minutes = 7;
     double hourly_rate = 0.0;
-    double overstay_rate = 0.0;
+    double overtime_rate_per_minute = 1.0;
     double base_fee = 0.0;
     double overstay_fee = 0.0;
     double total_fee = 0.0;
@@ -54,10 +55,11 @@ inline crow::json::wvalue sessionFeeSummaryJson(const SessionFeeSummaryData &dat
     json["reserved_end_time"] = data.reserved_end_time;
     json["duration_minutes"] = data.duration_minutes;
     json["billed_hours"] = data.billed_hours;
-    json["overstay_duration_minutes"] = data.overstay_duration_minutes;
-    json["billed_overstay_hours"] = data.billed_overstay_hours;
+    json["billed_overtime_minutes"] = data.billed_overtime_minutes;
+    json["overtime_duration_seconds"] = data.overtime_duration_seconds;
+    json["grace_buffer_minutes"] = data.grace_buffer_minutes;
     json["hourly_rate"] = data.hourly_rate;
-    json["overstay_rate"] = data.overstay_rate;
+    json["overtime_rate_per_minute"] = data.overtime_rate_per_minute;
     json["base_fee"] = data.base_fee;
     json["overstay_fee"] = data.overstay_fee;
     json["total_fee"] = data.total_fee;
@@ -67,4 +69,3 @@ inline crow::json::wvalue sessionFeeSummaryJson(const SessionFeeSummaryData &dat
 }
 
 } // namespace api
-

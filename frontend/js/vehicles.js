@@ -302,21 +302,72 @@ async function showAvailableSlots(vehicleId) {
     }
 }
 
+function requestParkingDuration() {
+    const dialog = document.getElementById("parkDurationDialog");
+    const form = document.getElementById("parkDurationForm");
+    const input = document.getElementById("parkDurationInput");
+    const error = document.getElementById("parkDurationError");
+    if (!dialog || !form || !input || !error) {
+        setVehicleMessage("The parking duration dialog could not be opened. Refresh the page and try again.", true);
+        return Promise.resolve(null);
+    }
+
+    input.value = "1:00";
+    error.textContent = "";
+    error.hidden = true;
+
+    return new Promise((resolve) => {
+        let selectedDurationMinutes = null;
+        dialog.addEventListener("close", () => {
+            resolve(dialog.returnValue === "confirm" ? selectedDurationMinutes : null);
+        }, { once: true });
+
+        form.onsubmit = (event) => {
+            event.preventDefault();
+            if (event.submitter && event.submitter.value === "cancel") {
+                dialog.close("cancel");
+                return;
+            }
+            const durationMatch = input.value.trim().match(/^(\d{1,3}):([0-5]\d)$/);
+            const durationMinutes = durationMatch
+                ? Number(durationMatch[1]) * 60 + Number(durationMatch[2])
+                : 0;
+            if (durationMinutes < 1 || durationMinutes > 10080) {
+                error.textContent = "Enter a stay from 00:01 to 168:00 in hours:minutes format.";
+                error.hidden = false;
+                input.focus();
+                return;
+            }
+            selectedDurationMinutes = durationMinutes;
+            dialog.close("confirm");
+        };
+
+        dialog.showModal();
+        input.focus();
+    });
+}
+
 async function parkVehicleInSlot(vehicleId, slotId) {
     if (!parkingMap) return;
+    const plannedDurationMinutes = await requestParkingDuration();
+    if (plannedDurationMinutes === null) return;
     const selectedElement = parkingMap.querySelector(
         `[data-slot-id="${CSS.escape(String(slotId))}"]`
     );
     if (selectedElement) {
         selectedElement.setAttribute("aria-disabled", "true");
     }
+
     try {
         const response = await fetch(
             `${API_BASE}/api/vehicles/${encodeURIComponent(vehicleId)}/park`,
             {
                 method: "POST",
                 headers: { ...authHeaders(), "Content-Type": "application/json" },
-                body: JSON.stringify({ slot_id: Number(slotId) })
+                body: JSON.stringify({
+                    slot_id: Number(slotId),
+                    duration_minutes: plannedDurationMinutes
+                })
             }
         );
         const data = await response.json();
@@ -325,7 +376,9 @@ async function parkVehicleInSlot(vehicleId, slotId) {
         }
         slotSelection = null;
         await loadVehicles();
-        setVehicleMessage(`Vehicle parked at ${data.parking.area_name} · ${data.parking.slot_number}.`);
+        setVehicleMessage(
+            `Vehicle parked at ${data.parking.area_name} · ${data.parking.slot_number}; planned until ${formatIsoTimestamp(data.parking.scheduled_end)}.`
+        );
         const parkingArea = areas.find((area) => String(area.area_id) === String(data.parking.area_id));
         if (parkingArea) {
             selectedArea = parkingArea;
@@ -376,6 +429,7 @@ async function showVehicleExitModal(vehicleId) {
         }
 
         const summary = data.session;
+        const fees = parkingFeeBreakdown(summary);
         exitModalBody.replaceChildren();
 
         const card = document.createElement("div");
@@ -398,9 +452,14 @@ async function showVehicleExitModal(vehicleId) {
             card.append(reservedRow);
         }
 
+        const graceRow = document.createElement("p");
+        graceRow.className = "muted";
+        graceRow.textContent = `The booked slot is charged at its hourly rate. The first ${fees.graceBufferMinutes} minutes after the booked end are free; after that, overtime is ₹${fees.overtimeRatePerMinute.toFixed(2)} per minute.`;
+        card.append(graceRow);
+
         const durRow = document.createElement("div");
         durRow.className = "fee-breakdown-row";
-        durRow.innerHTML = `<span class="muted">Parking Duration</span><span>${summary.duration_minutes} min (billed as ${summary.billed_hours} hr)</span>`;
+        durRow.innerHTML = `<span class="muted">Actual parking duration</span><span>${summary.duration_minutes} min (booked charge: ${summary.billed_hours} hr)</span>`;
         card.append(durRow);
 
         const baseFeeRow = document.createElement("div");
@@ -408,21 +467,21 @@ async function showVehicleExitModal(vehicleId) {
         baseFeeRow.innerHTML = `<span>Base Parking Fee (${summary.billed_hours}h × ₹${Number(summary.hourly_rate).toFixed(2)})</span><span>₹${Number(summary.base_fee).toFixed(2)}</span>`;
         card.append(baseFeeRow);
 
-        if (summary.overstay_duration_minutes > 0) {
+        if (fees.billedOvertimeMinutes > 0) {
             const overstayWarning = document.createElement("div");
             overstayWarning.className = "fee-overstay-warning";
-            overstayWarning.textContent = `⚠ Overstayed reserved time by ${summary.overstay_duration_minutes} min (billed as ${summary.billed_overstay_hours} hr @ ₹${Number(summary.overstay_rate).toFixed(2)}/hr)`;
+            overstayWarning.textContent = `The ${fees.graceBufferMinutes}-minute free grace period has ended. Overtime: ${fees.billedOvertimeMinutes} minute${fees.billedOvertimeMinutes === 1 ? "" : "s"} × ₹${fees.overtimeRatePerMinute.toFixed(2)} = ₹${fees.overtimeFee.toFixed(2)}.`;
             card.append(overstayWarning);
 
             const overstayFeeRow = document.createElement("div");
             overstayFeeRow.className = "fee-breakdown-row";
-            overstayFeeRow.innerHTML = `<span>Overstay Charge</span><span>₹${Number(summary.overstay_fee).toFixed(2)}</span>`;
+            overstayFeeRow.innerHTML = `<span>Overtime charge</span><span>₹${fees.overtimeFee.toFixed(2)}</span>`;
             card.append(overstayFeeRow);
         }
 
         const totalRow = document.createElement("div");
         totalRow.className = "fee-breakdown-row total";
-        totalRow.innerHTML = `<span>Total Fee to Pay</span><span>₹${Number(summary.total_fee).toFixed(2)}</span>`;
+        totalRow.innerHTML = `<span>Total Fee to Pay</span><span>₹${fees.totalFee.toFixed(2)}</span>`;
         card.append(totalRow);
 
         exitModalBody.append(card);

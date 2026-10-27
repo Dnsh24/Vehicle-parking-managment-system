@@ -1,20 +1,51 @@
 :root {
-    --ink: #17212b;
-    --muted: #71808f;
-    --line: #e5ebef;
-    --surface: #ffffff;
-    --background: #f5f8fa;
-    --green: #22a06b;
-    --green-soft: #e7f7ef;
-    --blue: #4384df;
-    --blue-soft: #e9f1ff;
-    --red: #e35d62;
-    --red-soft: #ffebec;
-    --orange: #ed9b3e;
-    --orange-soft: #fff3e2;
-    --gray: #9aa6af;
-    --gray-soft: #edf0f2;
-    --purple: #7354d4;
+    --forest: #064734;
+    --forest-hover: #053A2B;
+    --forest-light: #0B6B4D;
+    --leaf: #E0FFC2;
+    --leaf-strong: #B7E88A;
+    --app-background: #F4FBEE;
+    --surface: #FFFFFF;
+    --surface-subtle: #EAF6DD;
+    --border: #D5E8C9;
+    --text-primary: #0F2A21;
+    --text-muted: #5B7266;
+    --success: #22A55B;
+    --warning: #F59E0B;
+    --danger: #DC2626;
+    --info: #0EA5E9;
+    --primary-gradient: linear-gradient(135deg, #064734 0%, #0B6B4D 100%);
+    --card-shadow: 0 4px 20px rgba(6,71,52,0.08);
+    --hover-shadow: 0 8px 24px rgba(6,71,52,0.25);
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --radius-card: 14px;
+    --radius-control: 10px;
+    --radius-pill: 999px;
+    --font-xs: 10px;
+    --font-sm: 12px;
+    --font-base: 14px;
+    --font-lg: 18px;
+    --font-xl: 24px;
+    --ink: var(--text-primary);
+    --muted: var(--text-muted);
+    --line: var(--border);
+    --background: var(--app-background);
+    --green: var(--forest);
+    --green-soft: var(--leaf);
+    --blue: var(--info);
+    --blue-soft: var(--surface-subtle);
+    --red: var(--danger);
+    --red-soft: #FEE2E2;
+    --orange: var(--warning);
+    --orange-soft: #FEF3C7;
+    --gray: #7A8C82;
+    --gray-soft: var(--surface-subtle);
+    --purple: var(--forest-light);
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -357,6 +388,49 @@ dialog.exit-modal::backdrop {
   font-weight: 600;
 }
 
+.park-duration-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.park-duration-form > label {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.park-duration-form > input {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-subtle);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.park-duration-form > input:focus {
+  outline: none;
+  border-color: var(--forest-light);
+  box-shadow: 0 0 0 3px rgba(183, 232, 138, .55);
+}
+
+.park-duration-form .fee-breakdown-card p {
+  margin: 0;
+}
+
+.park-duration-form .form-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.park-duration-form .form-error[hidden] {
+  display: none;
+}
+
 .exit-modal-actions button.vehicle-cancel:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
@@ -399,4 +473,336 @@ dialog.exit-modal::backdrop {
 
 @media (max-width: 760px) {
     .history-notifications-grid { grid-template-columns: 1fr; }
+}
+
+/* Forest-and-leaf colors for the signed-in experience; auth screens keep their existing theme. */
+body {
+    background-color: var(--app-background);
+    background-image: radial-gradient(ellipse at top right, rgba(224, 255, 194, .38), transparent 38%);
+}
+
+.topbar {
+    border-bottom-color: var(--border);
+}
+
+.brand-mark,
+.dashboard-page-button.active,
+.refresh-button,
+.map-retry {
+    color: var(--leaf);
+    background: var(--primary-gradient);
+}
+
+.dashboard-page-button:hover,
+.floor-tab:hover,
+.admin-nav-tab:hover,
+.icon-button:hover,
+.change-area:hover {
+    color: var(--forest);
+    background-color: var(--surface-subtle);
+}
+
+.dashboard-page-button.active:hover,
+.refresh-button:hover,
+.map-retry:hover {
+    color: var(--leaf);
+    background: var(--forest-hover);
+}
+
+.dashboard-page-button:focus-visible,
+.floor-tab:focus-visible,
+.admin-nav-tab:focus-visible,
+.refresh-button:focus-visible,
+.map-retry:focus-visible,
+.admin-table button:focus-visible {
+    outline-color: var(--forest-light);
+    box-shadow: 0 0 0 3px rgba(183, 232, 138, .65);
+}
+
+.panel,
+.summary-card {
+    border-color: var(--border);
+    box-shadow: var(--card-shadow);
+}
+
+.vehicle-card,
+.reservation-slot-card,
+.reservation-card,
+.history-card,
+.notification-card {
+    border-color: var(--border);
+}
+
+.summary-card strong,
+.page-heading h1,
+.panel-heading h2 {
+    color: var(--forest);
+}
+
+.summary-icon.green,
+.summary-icon.blue,
+.summary-icon.purple,
+.section-icon {
+    color: var(--forest);
+    background: var(--leaf);
+}
+
+.summary-icon.blue,
+.summary-icon.purple {
+    border: 1px solid var(--leaf-strong);
+}
+
+.live-badge,
+.badge.badge-user,
+.badge.badge-active,
+.slot-choice,
+.admin-table button.success {
+    color: var(--forest);
+    background-color: var(--leaf);
+}
+
+.slot-choice,
+.admin-table button.success {
+    border-color: var(--leaf-strong);
+}
+
+.badge.badge-admin {
+    color: var(--leaf);
+    background-color: var(--forest);
+}
+
+.badge.badge-inactive {
+    color: var(--text-muted);
+    background-color: var(--surface-subtle);
+}
+
+.badge.badge-closed,
+.admin-table button.danger,
+.vehicle-actions button[data-action="delete"] {
+    color: var(--danger);
+}
+
+.admin-table button.danger {
+    border-color: #FECACA;
+    background-color: #FEE2E2;
+}
+
+.admin-table button.danger:hover {
+    background-color: #FECACA;
+}
+
+.admin-table button.primary {
+    color: var(--leaf);
+    background: var(--forest-light);
+    border-color: var(--forest-light);
+}
+
+.admin-table button:hover,
+.vehicle-cancel:hover,
+.vehicle-actions button:hover {
+    background-color: var(--surface-subtle);
+}
+
+.admin-table th {
+    color: var(--forest);
+    background-color: var(--surface-subtle);
+    border-bottom-color: var(--border);
+}
+
+.admin-table tr:hover td {
+    background-color: var(--surface-subtle);
+}
+
+.admin-table select,
+.admin-filter-bar select,
+.vehicle-form input:not([type="checkbox"]),
+.vehicle-form select,
+.reservation-form input:not([type="checkbox"]),
+.reservation-form select,
+.admin-form input:not([type="checkbox"]),
+.admin-form select {
+    border-color: var(--border);
+}
+
+.vehicle-form input:not([type="checkbox"]):focus,
+.vehicle-form select:focus,
+.reservation-form input:not([type="checkbox"]):focus,
+.reservation-form select:focus,
+.admin-form input:not([type="checkbox"]):focus,
+.admin-form select:focus,
+.admin-table select:focus,
+.admin-filter-bar select:focus {
+    border-color: var(--forest-light);
+    outline-color: var(--forest-light);
+    box-shadow: 0 0 0 3px rgba(183, 232, 138, .55);
+}
+
+.reservation-status,
+.slot.reserved {
+    color: var(--forest);
+    background-color: var(--surface-subtle);
+    border-color: var(--leaf-strong);
+}
+
+.slot.available {
+    color: #176B3A;
+    background-color: #E8F7E8;
+    border-color: var(--success);
+}
+
+.slot.occupied {
+    color: #991B1B;
+    background-color: #FEE2E2;
+    border-color: var(--danger);
+}
+
+.slot.maintenance {
+    color: #854D0E;
+    background-color: #FEF3C7;
+    border-color: var(--warning);
+}
+
+.slot.unavailable {
+    color: var(--text-muted);
+    background: repeating-linear-gradient(135deg, #EAF6DD, #EAF6DD 5px, #D5E8C9 6px, #D5E8C9 7px);
+    border-color: #8AA393;
+}
+
+.slot.slot-selectable {
+    outline-color: var(--forest-light);
+}
+
+.parking-map {
+    background-color: #EAF6DD;
+    border-color: #8AA393;
+    box-shadow: inset 0 0 0 2px var(--forest);
+}
+
+.map-row,
+.floor-tabs {
+    background-color: var(--surface-subtle);
+    border-color: var(--border);
+}
+
+.map-edge,
+.category-title {
+    color: var(--forest);
+    background-color: var(--leaf);
+    border-color: var(--leaf-strong);
+}
+
+.category-title span {
+    color: var(--text-muted);
+}
+
+.map-message {
+    color: var(--text-primary);
+}
+
+.map-message span {
+    color: var(--text-muted);
+}
+
+.popover-notification,
+.popover-notification.is-unread,
+.notification-card.is-unread {
+    background-color: var(--surface-subtle);
+    border-color: var(--border);
+}
+
+.popover-link,
+.change-area {
+    color: var(--forest);
+}
+
+.account-logout-button:hover {
+    background-color: #FEE2E2;
+}
+
+dialog.exit-modal {
+    color: var(--text-primary);
+    background: var(--surface);
+    border-color: var(--border);
+    box-shadow: 0 24px 60px rgba(6, 71, 52, .2), 0 0 0 1px rgba(183, 232, 138, .35);
+}
+
+dialog.exit-modal::backdrop {
+    background: rgba(6, 71, 52, .42);
+}
+
+.exit-modal-header {
+    border-bottom-color: var(--border);
+}
+
+.exit-modal-header h3,
+.fee-breakdown-row strong {
+    color: var(--forest);
+}
+
+.exit-modal-close {
+    color: var(--forest);
+    background: var(--surface-subtle);
+    border-color: var(--border);
+}
+
+.exit-modal-close:hover {
+    color: var(--forest-hover);
+    background: var(--leaf);
+}
+
+.fee-breakdown-card,
+.exit-payment-section select {
+    color: var(--text-primary);
+    background: var(--surface-subtle);
+    border-color: var(--border);
+}
+
+.fee-breakdown-row.total {
+    color: var(--forest);
+    border-top-color: var(--border);
+}
+
+.fee-overstay-warning {
+    color: #854D0E;
+    background: #FEF3C7;
+    border-color: #FCD34D;
+}
+
+.exit-payment-section label {
+    color: var(--forest);
+}
+
+.exit-payment-section select:focus {
+    border-color: var(--forest-light);
+    box-shadow: 0 0 0 3px rgba(183, 232, 138, .55);
+}
+
+.exit-modal-actions {
+    border-top-color: var(--border);
+}
+
+.exit-modal-actions button.refresh-button {
+    color: var(--leaf);
+    background: var(--primary-gradient);
+    box-shadow: var(--card-shadow);
+}
+
+.exit-modal-actions button.refresh-button:hover {
+    background: var(--forest-hover);
+    box-shadow: var(--hover-shadow);
+}
+
+.exit-modal-actions button.vehicle-cancel {
+    color: var(--forest);
+    border-color: var(--border);
+}
+
+.exit-modal-actions button.vehicle-cancel:hover {
+    color: var(--forest-hover);
+    background: var(--surface-subtle);
+}
+
+.notification-unread-badge {
+    color: #FFFFFF;
+    background: var(--danger);
 }

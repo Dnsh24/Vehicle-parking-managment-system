@@ -99,7 +99,7 @@ const std::string reservationDetailsQuery =
     "to_char(r.end_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS end_time, "
     "r.status, "
     "to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS created_at, "
-    "pr.hourly_rate "
+    "COALESCE(pr.hourly_rate, 40.00) AS hourly_rate "
     "FROM reservations r "
     "JOIN vehicles v ON v.vehicle_id = r.vehicle_id "
     "JOIN parking_slots ps ON ps.slot_id = r.slot_id "
@@ -195,7 +195,8 @@ void registerReservationRoutes(
                 "SELECT ps.slot_id, ps.area_id, pa.name AS area_name, pa.location, "
                 "ps.slot_number, ps.vehicle_type, ps.slot_type, "
                 "(ps.is_ev OR ps.slot_type ~* '(^|[^[:alnum:]])ev([^[:alnum:]]|$)' "
-                "OR ps.slot_type ILIKE '%electric%' OR ps.slot_type ILIKE '%charg%') AS is_ev, pr.hourly_rate "
+                "OR ps.slot_type ILIKE '%electric%' OR ps.slot_type ILIKE '%charg%') AS is_ev, "
+                "COALESCE(pr.hourly_rate, 40.00) AS hourly_rate "
                 "FROM vehicles v "
                 "JOIN parking_slots ps ON ps.vehicle_type = v.vehicle_type "
                 "JOIN parking_areas pa ON pa.area_id = ps.area_id "
@@ -258,10 +259,7 @@ void registerReservationRoutes(
                 slot["vehicle_type"] = row["vehicle_type"].c_str();
                 slot["slot_type"] = row["slot_type"].c_str();
                 slot["is_ev"] = row["is_ev"].as<bool>();
-                if (!row["hourly_rate"].is_null())
-                {
-                    slot["hourly_rate"] = row["hourly_rate"].as<double>();
-                }
+                slot["hourly_rate"] = row["hourly_rate"].as<double>();
                 response["slots"][index++] = std::move(slot);
             }
             return crow::response(response);

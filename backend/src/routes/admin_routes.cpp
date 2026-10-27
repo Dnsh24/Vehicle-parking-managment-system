@@ -183,6 +183,55 @@ void registerAdminRoutes(crow::App<crow::CORSHandler> &app, Database &database)
              return api::errorResponse(503, "DATABASE_UNAVAILABLE", "The user status could not be updated.");
          } });
 
+    // ---- Users: permanent deletion ----
+    CROW_ROUTE(app, "/api/admin/users/<uint>").methods(crow::HTTPMethod::DELETE)
+    ([&database](const crow::request &request, unsigned int target_user_id)
+     {
+         try
+         {
+             const auto user = findAuthenticatedUser(database, request);
+             if (!user)
+             {
+                 return unauthorized();
+             }
+             if (user->role != "admin")
+             {
+                 return forbidden();
+             }
+             const std::int64_t target_id = static_cast<std::int64_t>(target_user_id);
+             if (target_id == user->user_id)
+             {
+                 return api::errorResponse(
+                     400,
+                     "CANNOT_MODIFY_OWN_ADMIN_ACCESS",
+                     "An administrator cannot delete their own account.");
+             }
+
+             switch (database.deleteUserWithoutFutureActivity(target_id))
+             {
+             case UserDeletionResult::not_found:
+                 return api::errorResponse(404, "USER_NOT_FOUND", "The requested user does not exist.");
+             case UserDeletionResult::future_reservation:
+                 return api::errorResponse(
+                     409,
+                     "USER_HAS_FUTURE_RESERVATION",
+                     "This account has a future reservation and cannot be permanently deleted.");
+             case UserDeletionResult::active_activity:
+                 return api::errorResponse(
+                     409,
+                     "USER_HAS_ACTIVE_ACTIVITY",
+                     "This account has an active reservation or parking session and cannot be permanently deleted.");
+             case UserDeletionResult::deleted:
+                 return crow::response(204);
+             }
+             return api::errorResponse(500, "USER_DELETION_FAILED", "The user could not be deleted.");
+         }
+         catch (const std::exception &exception)
+         {
+             std::cerr << "Admin user deletion failed: " << exception.what() << std::endl;
+             return api::errorResponse(503, "DATABASE_UNAVAILABLE", "The user could not be deleted.");
+         } });
+
     // ---- Areas: list ----
     CROW_ROUTE(app, "/api/admin/parking-areas")
     ([&database](const crow::request &request)

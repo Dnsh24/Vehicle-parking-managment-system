@@ -24,6 +24,7 @@ const historyPageSize = 10;
 const notificationPageSize = 10;
 let historyPageOffset = 0;
 let notificationPageOffset = 0;
+let reservationsById = new Map();
 
 function setReservationMessage(message, isError = false) {
     if (!reservationMessage) return;
@@ -127,6 +128,13 @@ function reservationSearchTimes() {
 
 function renderReservationResults(slots) {
     if (!reservationResults) return;
+    const bookedHours = Math.max(
+        1,
+        Math.ceil(
+            (new Date(reservationSearchForm.elements.end_time.value) -
+                new Date(reservationSearchForm.elements.start_time.value)) / 3600000
+        )
+    );
     reservationResults.replaceChildren();
     if (slots.length === 0) {
         const empty = document.createElement("p");
@@ -145,15 +153,23 @@ function renderReservationResults(slots) {
         const description = document.createElement("p");
         description.textContent = `${slot.slot_type}${slot.is_ev ? " · EV charging" : ""} · ${slot.location}`;
         information.append(title, description);
-        if (slot.hourly_rate !== undefined) {
-            const price = document.createElement("p");
-            price.textContent = `${new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(slot.hourly_rate)} / hour`;
-            information.append(price);
-        }
+        const hourlyRate = Number(slot.hourly_rate);
+        const fullSlotPrice = new Intl.NumberFormat("en-IN", {
+            style: "currency",
+            currency: "INR"
+        }).format(hourlyRate * bookedHours);
+        const price = document.createElement("p");
+        price.textContent = `${new Intl.NumberFormat("en-IN", {
+            style: "currency",
+            currency: "INR"
+        }).format(hourlyRate)} / hour · full ${bookedHours}-hour slot: ${fullSlotPrice}`;
+        information.append(price);
         const button = document.createElement("button");
         button.type = "button";
         button.className = "refresh-button";
         button.dataset.slotId = slot.slot_id;
+        button.dataset.hourlyRate = String(hourlyRate);
+        button.dataset.bookedHours = String(bookedHours);
         button.textContent = "Reserve this slot";
         card.append(information, button);
         reservationResults.append(card);
@@ -162,6 +178,10 @@ function renderReservationResults(slots) {
 
 function renderReservations(reservations) {
     if (!reservationList) return;
+    reservationsById = new Map(reservations.map((reservation) => [
+        String(reservation.reservation_id),
+        reservation
+    ]));
     reservationList.replaceChildren();
     if (reservations.length === 0) {
         const empty = document.createElement("p");
@@ -526,6 +546,17 @@ if (reservationResults) {
         setReservationMessage("");
         try {
             const times = reservationSearchTimes();
+            const bookedHours = Number(button.dataset.bookedHours);
+            const hourlyRate = Number(button.dataset.hourlyRate);
+            const fullSlotPrice = new Intl.NumberFormat("en-IN", {
+                style: "currency",
+                currency: "INR"
+            }).format(bookedHours * hourlyRate);
+            if (!window.confirm(
+                `Reserve this slot for ${bookedHours} billed hour${bookedHours === 1 ? "" : "s"} (${fullSlotPrice})? The full booked time is charged even if you leave early. At check-in, the first 7 minutes after the booked end are free; then overtime costs ₹1 per minute, with each started minute charged as a full minute.`
+            )) {
+                return;
+            }
             const response = await fetch(`${API_BASE}/api/reservations`, {
                 method: "POST",
                 headers: { ...authHeaders(), "Content-Type": "application/json" },
@@ -555,6 +586,28 @@ if (reservationList) {
         const reservationId = encodeURIComponent(button.dataset.reservationId);
         try {
             if (button.dataset.action === "check-in") {
+                const reservation = reservationsById.get(String(button.dataset.reservationId));
+                if (!reservation) {
+                    throw new Error("Reservation details are unavailable. Refresh and try again.");
+                }
+                const bookedHours = Math.max(
+                    1,
+                    Math.ceil((Date.parse(reservation.end_time) - Date.parse(reservation.start_time)) / 3600000)
+                );
+                const hourlyRate = Number(reservation.hourly_rate);
+                if (!Number.isFinite(hourlyRate) || hourlyRate < 0) {
+                    throw new Error("The parking rate could not be determined. Check-in is blocked to avoid an unexpected charge.");
+                }
+                const bookedFee = bookedHours * hourlyRate;
+                const currency = new Intl.NumberFormat("en-IN", {
+                    style: "currency",
+                    currency: "INR"
+                }).format(bookedFee);
+                if (!window.confirm(
+                    `Check in to reservation #${reservation.reservation_id}? The full booked slot duration (${bookedHours} hour${bookedHours === 1 ? "" : "s"}, ${currency}) is charged even if you leave early. After the booked end time, the first 7 minutes are free; then overtime costs ₹1 per minute, with each started minute charged as a full minute.`
+                )) {
+                    return;
+                }
                 button.disabled = true;
                 const response = await fetch(`${API_BASE}/api/reservations/${reservationId}/check-in`, {
                     method: "POST",
@@ -753,6 +806,7 @@ async function showSessionExitModal(sessionId, isCheckoutMode) {
         }
 
         const summary = data.session;
+        const fees = parkingFeeBreakdown(summary);
         exitModalBody.replaceChildren();
 
         const card = document.createElement("div");
@@ -773,9 +827,14 @@ async function showSessionExitModal(sessionId, isCheckoutMode) {
         reservedRow.innerHTML = `<span class="muted">Reserved Until</span><span>${formatIsoTimestamp(summary.reserved_end_time)}</span>`;
         card.append(reservedRow);
 
+        const graceRow = document.createElement("p");
+        graceRow.className = "muted";
+        graceRow.textContent = `The booked slot is charged at its hourly rate. The first ${fees.graceBufferMinutes} minutes after the reserved end are free; after that, overtime is ₹${fees.overtimeRatePerMinute.toFixed(2)} per minute.`;
+        card.append(graceRow);
+
         const durRow = document.createElement("div");
         durRow.className = "fee-breakdown-row";
-        durRow.innerHTML = `<span class="muted">Parking Duration</span><span>${summary.duration_minutes} min (billed as ${summary.billed_hours} hr)</span>`;
+        durRow.innerHTML = `<span class="muted">Actual parking duration</span><span>${summary.duration_minutes} min (booked charge: ${summary.billed_hours} hr)</span>`;
         card.append(durRow);
 
         const baseFeeRow = document.createElement("div");
@@ -783,21 +842,21 @@ async function showSessionExitModal(sessionId, isCheckoutMode) {
         baseFeeRow.innerHTML = `<span>Base Parking Fee (${summary.billed_hours}h × ₹${summary.hourly_rate.toFixed(2)})</span><span>₹${summary.base_fee.toFixed(2)}</span>`;
         card.append(baseFeeRow);
 
-        if (summary.overstay_duration_minutes > 0) {
+        if (fees.billedOvertimeMinutes > 0) {
             const overstayWarning = document.createElement("div");
             overstayWarning.className = "fee-overstay-warning";
-            overstayWarning.textContent = `⚠ Overstayed reserved time by ${summary.overstay_duration_minutes} min (billed as ${summary.billed_overstay_hours} hr @ ₹${summary.overstay_rate.toFixed(2)}/hr)`;
+            overstayWarning.textContent = `The ${fees.graceBufferMinutes}-minute free grace period has ended. Overtime: ${fees.billedOvertimeMinutes} minute${fees.billedOvertimeMinutes === 1 ? "" : "s"} × ₹${fees.overtimeRatePerMinute.toFixed(2)} = ₹${fees.overtimeFee.toFixed(2)}.`;
             card.append(overstayWarning);
 
             const overstayFeeRow = document.createElement("div");
             overstayFeeRow.className = "fee-breakdown-row";
-            overstayFeeRow.innerHTML = `<span>Overstay Charge</span><span>₹${summary.overstay_fee.toFixed(2)}</span>`;
+            overstayFeeRow.innerHTML = `<span>Overtime charge</span><span>₹${fees.overtimeFee.toFixed(2)}</span>`;
             card.append(overstayFeeRow);
         }
 
         const totalRow = document.createElement("div");
         totalRow.className = "fee-breakdown-row total";
-        totalRow.innerHTML = `<span>Total Fee</span><span>₹${summary.total_fee.toFixed(2)}</span>`;
+        totalRow.innerHTML = `<span>Total Fee</span><span>₹${fees.totalFee.toFixed(2)}</span>`;
         card.append(totalRow);
 
         exitModalBody.append(card);

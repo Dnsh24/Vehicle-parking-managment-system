@@ -649,6 +649,27 @@
       </section>
     </main>
 
+    <dialog id="parkDurationDialog" class="exit-modal">
+      <div class="exit-modal-content">
+        <div class="exit-modal-header">
+          <h3>Plan Your Parking Stay</h3>
+          <button type="submit" form="parkDurationForm" formmethod="dialog" value="cancel" class="exit-modal-close" aria-label="Close">✕</button>
+        </div>
+        <form id="parkDurationForm" class="park-duration-form" method="dialog">
+          <label for="parkDurationInput">How long do you plan to park? (HH:MM)</label>
+          <input id="parkDurationInput" type="text" inputmode="numeric" value="1:00" placeholder="1:30" aria-describedby="parkDurationHelp parkDurationError" />
+          <p id="parkDurationError" class="form-error" role="alert" hidden></p>
+          <div class="fee-breakdown-card">
+            <p id="parkDurationHelp">The full booked time is charged even if you leave early. The first 7 minutes after your booked end are free; after that, overtime costs ₹1 per started minute.</p>
+          </div>
+          <div class="exit-modal-actions">
+            <button type="submit" formmethod="dialog" value="cancel" class="vehicle-cancel">Cancel</button>
+            <button type="submit" value="confirm" class="refresh-button">Continue to Park</button>
+          </div>
+        </form>
+      </div>
+    </dialog>
+
     <dialog id="sessionExitDialog" class="exit-modal">
       <div class="exit-modal-content">
         <div class="exit-modal-header">
