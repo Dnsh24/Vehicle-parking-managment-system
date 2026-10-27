@@ -378,6 +378,11 @@ void registerReservationRoutes(
                 return api::errorResponse(409, "RESERVATION_NOT_CHECK_IN_ELIGIBLE", "Only confirmed reservations can be checked in.");
             case ReservationCheckInStatus::too_early:
                 return api::errorResponse(409, "CHECK_IN_NOT_OPEN", "Check-in opens at the reservation start time.");
+            case ReservationCheckInStatus::late_cancelled:
+                return api::errorResponse(
+                    409,
+                    "RESERVATION_CANCELLED_LATE",
+                    "This reservation was cancelled because check-in was not completed within 5 minutes after its start time. A notification has been sent.");
             case ReservationCheckInStatus::expired:
                 return api::errorResponse(409, "RESERVATION_EXPIRED", "The reservation end time has passed.");
             case ReservationCheckInStatus::slot_unavailable:

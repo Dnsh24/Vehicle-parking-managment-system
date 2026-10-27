@@ -8,7 +8,7 @@ frontend, a C++ backend using Crow, and a PostgreSQL database.
 | Component | Status |
 | --- | --- |
 | Frontend | Authentication, parking availability, vehicles, reservations, active sessions, history, notifications, and administrator management implemented. |
-| PostgreSQL | Schema implemented with 14 core tables, constraints, and indexes; Phase 8 notification indexes are in `database/phase8_history_notifications.sql`. See [database.md](database.md). |
+| PostgreSQL | Schema implemented with 12 core tables, constraints, and indexes; Phase 8 notification indexes are in `database/phase8_history_notifications.sql`. See [database.md](database.md). |
 | C++ backend | Crow server with PostgreSQL access, bearer authentication, transactional reservations and sessions, manual exit billing, history, notifications, and administration. |
 | REST API | Health, authentication, profile, parking availability, vehicles, reservations, sessions, history, notifications, and administrator endpoints implemented. |
 | Frontend-backend integration | Browser `fetch` integration targets `http://localhost:3000`; live Phase 8 database end-to-end verification remains. |
@@ -82,7 +82,7 @@ reporting remain planned.
 
 ### Database
 
-- Defines the 14 core tables documented in [database.md](database.md).
+- Defines the 12 core tables documented in [database.md](database.md).
 - Uses `pgcrypto` and `gen_random_uuid()` for QR token generation.
 - Defines primary keys, foreign keys, checks, unique constraints, and indexes.
 
@@ -154,7 +154,7 @@ Create a PostgreSQL database named `parking_management`, then run:
 psql -U <user> -d parking_management -f database/schema.sql
 ```
 
-The schema file creates the `pgcrypto` extension and all 14 tables. Do not put
+The schema file creates the `pgcrypto` extension and all 12 tables. Do not put
 real passwords in documentation or source code.
 
 For an existing database created before Phase 2 authentication, run the

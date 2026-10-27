@@ -64,6 +64,7 @@ function setAdminMessage(element, message, isError = false) {
     if (!element) return;
     element.textContent = message;
     element.classList.toggle("is-error", isError);
+    if (message) showAppNotice(message, isError ? "error" : "success");
     if (message) {
         setTimeout(() => {
             if (element.textContent === message) {
@@ -222,7 +223,10 @@ if (adminUsersList) {
         if (!deleteButton) return;
         const userId = deleteButton.dataset.userId;
         const username = deleteButton.dataset.username;
-        if (!confirm(`Permanently delete account #${userId} (${username}) and its past parking and payment history? This cannot be undone. Accounts with future reservations or active parking cannot be deleted.`)) {
+        if (!await showAppConfirm(`Permanently delete account #${userId} (${username}) and its past parking and payment history? This cannot be undone. Accounts with future reservations or active parking cannot be deleted.`, {
+            title: "Delete account",
+            acceptLabel: "Delete account"
+        })) {
             return;
         }
         try {
@@ -238,6 +242,64 @@ if (adminUsersList) {
 // ---------------------------------------------------------------------
 // 2. Parking Areas Management
 // ---------------------------------------------------------------------
+async function autoGenerateSlotsForArea(areaId, areaName, capacity) {
+    const count = Number(capacity) || 20;
+    let prefix = "S";
+    const nameLower = (areaName || "").toLowerCase();
+    if (nameLower.includes("ground") || areaName === "G") prefix = "G";
+    else if (nameLower.includes("first") || areaName === "1") prefix = "1";
+    else if (nameLower.includes("second") || areaName === "2") prefix = "2";
+    else if (nameLower.includes("third") || areaName === "3") prefix = "3";
+    else if (nameLower.includes("fourth") || areaName === "4") prefix = "4";
+    else if (/^\d+$/.test(areaName)) prefix = areaName;
+    else {
+        const words = (areaName || "Area").split(/\s+/);
+        prefix = words[words.length - 1].substring(0, 2).toUpperCase();
+    }
+
+    const slots = [];
+    for (let i = 1; i <= count; i++) {
+        let vehicleType = "car";
+        let slotType = "standard";
+        let isEv = false;
+
+        if (i <= Math.max(1, Math.floor(count * 0.1))) {
+            vehicleType = "truck";
+            slotType = "truck";
+        } else if (i <= Math.max(2, Math.floor(count * 0.35))) {
+            vehicleType = i % 2 === 0 ? "scooter" : "bike";
+            slotType = "two-wheeler";
+        } else if (i > count - 2 && count >= 10) {
+            vehicleType = "car";
+            slotType = "handicapped";
+        } else if (i > count - 4 && count >= 10) {
+            vehicleType = "car";
+            slotType = "ev";
+            isEv = true;
+        }
+
+        const rowLetter = String.fromCharCode(65 + Math.floor((i - 1) / 8));
+        const numInRow = String(((i - 1) % 8) + 1).padStart(2, "0");
+        const slotNumber = `${prefix}-${rowLetter}${numInRow}`;
+
+        slots.push({
+            slot_number: slotNumber,
+            vehicle_type: vehicleType,
+            slot_type: slotType,
+            is_ev: isEv,
+            status: "available"
+        });
+    }
+
+    for (const slot of slots) {
+        try {
+            await adminApiCall(`/api/admin/parking-areas/${encodeURIComponent(areaId)}/slots`, "POST", slot);
+        } catch (e) {
+            console.warn(`Could not add slot ${slot.slot_number}:`, e);
+        }
+    }
+}
+
 async function loadAdminAreas() {
     if (!adminAreasListEl) return;
     adminAreasListEl.innerHTML = `<tr><td colspan="8" class="muted">Loading areas...</td></tr>`;
@@ -259,6 +321,7 @@ async function loadAdminAreas() {
                 <td><span class="badge badge-${escapeHtml(area.status)}">${escapeHtml(area.status)}</span></td>
                 <td>
                     <div class="admin-actions-cell">
+                        ${area.slot_count === 0 && area.capacity > 0 ? `<button type="button" class="admin-generate-slots-btn" data-area-id="${area.area_id}" data-capacity="${area.capacity}" data-name="${escapeHtml(area.name)}">+ Slots</button>` : ""}
                         <button type="button" class="admin-edit-area-btn" data-area-id="${area.area_id}">Edit</button>
                         <button type="button" class="danger admin-delete-area-btn" data-area-id="${area.area_id}">Delete</button>
                     </div>
@@ -293,8 +356,16 @@ if (adminAreaForm) {
                 await adminApiCall(`/api/admin/parking-areas/${encodeURIComponent(areaId)}`, "PUT", payload);
                 setAdminMessage(adminAreasMessage, `Area #${areaId} updated successfully.`);
             } else {
-                await adminApiCall("/api/admin/parking-areas", "POST", payload);
-                setAdminMessage(adminAreasMessage, "New parking area created.");
+                const res = await adminApiCall("/api/admin/parking-areas", "POST", payload);
+                const newAreaId = res?.area?.area_id || res?.area_id;
+                const autoGen = formData.get("auto_generate_slots") === "on";
+                if (autoGen && payload.capacity > 0 && newAreaId) {
+                    setAdminMessage(adminAreasMessage, `Area created. Generating ${payload.capacity} slots...`);
+                    await autoGenerateSlotsForArea(newAreaId, payload.name, payload.capacity);
+                    setAdminMessage(adminAreasMessage, `New parking area and ${payload.capacity} slots created successfully!`);
+                } else {
+                    setAdminMessage(adminAreasMessage, "New parking area created.");
+                }
             }
             resetAreaForm();
             await loadAdminAreas();
@@ -311,6 +382,10 @@ function resetAreaForm() {
     adminAreaForm.elements.area_id.value = "";
     if (saveAreaButton) saveAreaButton.textContent = "Save Area";
     if (cancelAreaEdit) cancelAreaEdit.hidden = true;
+    const autoGenCheck = document.getElementById("autoGenerateSlotsCheck");
+    if (autoGenCheck) autoGenCheck.checked = true;
+    const autoGenLabel = document.getElementById("autoGenerateSlotsLabel");
+    if (autoGenLabel) autoGenLabel.style.display = "";
 }
 
 if (cancelAreaEdit) {
@@ -319,6 +394,27 @@ if (cancelAreaEdit) {
 
 if (adminAreasListEl) {
     adminAreasListEl.addEventListener("click", async (event) => {
+        const genSlotsBtn = event.target.closest(".admin-generate-slots-btn");
+        if (genSlotsBtn) {
+            const areaId = genSlotsBtn.dataset.areaId;
+            const capacity = genSlotsBtn.dataset.capacity;
+            const name = genSlotsBtn.dataset.name;
+            if (!await showAppConfirm(`Auto-generate ${capacity} parking slots for area "${name}"?`, {
+                title: "Generate slots",
+                acceptLabel: "Generate slots"
+            })) return;
+            try {
+                setAdminMessage(adminAreasMessage, `Generating ${capacity} slots for "${name}"...`);
+                await autoGenerateSlotsForArea(areaId, name, capacity);
+                setAdminMessage(adminAreasMessage, `Successfully generated slots for "${name}".`);
+                await loadAdminAreas();
+                if (typeof loadAreas === "function") await loadAreas();
+            } catch (error) {
+                setAdminMessage(adminAreasMessage, error.message, true);
+            }
+            return;
+        }
+
         const editBtn = event.target.closest(".admin-edit-area-btn");
         if (editBtn) {
             const areaId = editBtn.dataset.areaId;
@@ -332,6 +428,8 @@ if (adminAreasListEl) {
             adminAreaForm.elements.status.value = area.status;
             if (saveAreaButton) saveAreaButton.textContent = "Update Area";
             if (cancelAreaEdit) cancelAreaEdit.hidden = false;
+            const autoGenLabel = document.getElementById("autoGenerateSlotsLabel");
+            if (autoGenLabel) autoGenLabel.style.display = "none";
             adminAreaForm.scrollIntoView({ behavior: "smooth", block: "nearest" });
             return;
         }
@@ -339,7 +437,10 @@ if (adminAreasListEl) {
         const deleteBtn = event.target.closest(".admin-delete-area-btn");
         if (deleteBtn) {
             const areaId = deleteBtn.dataset.areaId;
-            if (!confirm(`Are you sure you want to delete parking area #${areaId}?`)) return;
+            if (!await showAppConfirm(`Are you sure you want to delete parking area #${areaId}?`, {
+                title: "Delete parking area",
+                acceptLabel: "Delete area"
+            })) return;
             try {
                 await adminApiCall(`/api/admin/parking-areas/${encodeURIComponent(areaId)}`, "DELETE");
                 setAdminMessage(adminAreasMessage, `Parking area #${areaId} deleted.`);
@@ -486,7 +587,10 @@ if (adminSlotsListEl) {
         const deleteBtn = event.target.closest(".admin-delete-slot-btn");
         if (deleteBtn) {
             const slotId = deleteBtn.dataset.slotId;
-            if (!confirm(`Are you sure you want to delete slot #${slotId}?`)) return;
+            if (!await showAppConfirm(`Are you sure you want to delete slot #${slotId}?`, {
+                title: "Delete parking slot",
+                acceptLabel: "Delete slot"
+            })) return;
             try {
                 await adminApiCall(`/api/admin/parking-slots/${encodeURIComponent(slotId)}`, "DELETE");
                 setAdminMessage(adminSlotsMessage, `Slot #${slotId} deleted.`);
@@ -615,7 +719,10 @@ if (adminRatesListEl) {
         const deleteBtn = event.target.closest(".admin-delete-rate-btn");
         if (deleteBtn) {
             const rateId = deleteBtn.dataset.rateId;
-            if (!confirm(`Are you sure you want to delete rate #${rateId}?`)) return;
+            if (!await showAppConfirm(`Are you sure you want to delete rate #${rateId}?`, {
+                title: "Delete parking rate",
+                acceptLabel: "Delete rate"
+            })) return;
             try {
                 await adminApiCall(`/api/admin/parking-rates/${encodeURIComponent(rateId)}`, "DELETE");
                 setAdminMessage(adminRatesMessage, `Parking rate #${rateId} deleted.`);
@@ -749,7 +856,10 @@ if (adminMaintenanceListEl) {
         const deleteBtn = event.target.closest(".admin-delete-maint-btn");
         if (deleteBtn) {
             const maintId = deleteBtn.dataset.maintId;
-            if (!confirm(`Are you sure you want to delete maintenance record #${maintId}?`)) return;
+            if (!await showAppConfirm(`Are you sure you want to delete maintenance record #${maintId}?`, {
+                title: "Delete maintenance record",
+                acceptLabel: "Delete record"
+            })) return;
             try {
                 await adminApiCall(`/api/admin/maintenance/${encodeURIComponent(maintId)}`, "DELETE");
                 setAdminMessage(adminMaintenanceMessage, `Maintenance #${maintId} removed.`);

@@ -25,7 +25,7 @@
 - Phase 8 history and in-app notifications: user-scoped paginated history and
   notifications, read/unread controls, and transactional workflow event
   notifications implemented; live database end-to-end verification remains
-- PostgreSQL schema with 14 core tables, constraints, and indexes
+- PostgreSQL schema with 12 core tables, constraints, and indexes
 
 ### In progress
 

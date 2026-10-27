@@ -9,6 +9,11 @@
 #include <optional>
 #include <string>
 
+namespace parking::reservations
+{
+inline constexpr int check_in_grace_minutes = 5;
+}
+
 struct DatabaseCheckResult
 {
     bool connected;
@@ -45,6 +50,7 @@ enum class ReservationCheckInStatus
     not_found,
     not_confirmed,
     too_early,
+    late_cancelled,
     expired,
     slot_unavailable,
     vehicle_unavailable

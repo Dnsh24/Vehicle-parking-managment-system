@@ -17,8 +17,12 @@ const parkingMap = document.getElementById("parkingMap");
 const floorTitle = document.getElementById("floorTitle");
 const availableCount = document.getElementById("availableCount");
 const areaName = document.querySelector(".area-picker h2");
-const floorTabs = document.querySelectorAll(".floor-tab");
-const refreshButton = document.getElementById("refreshButton");
+const floorTabsNav = document.getElementById("floorTabsNav") || document.querySelector(".floor-tabs");
+const areaDropdown = document.getElementById("areaDropdown");
+const areaPickerTitle = document.getElementById("areaPickerTitle");
+const summaryHours = document.getElementById("summaryHours");
+const summaryLocation = document.getElementById("summaryLocation");
+const refreshButton = document.getElementById("refreshButton") || document.getElementById("refreshMapButton");
 const changeAreaButton = document.getElementById("changeAreaButton");
 
 let areas = [];
@@ -214,6 +218,105 @@ function renderFloor(area, slots) {
     });
 }
 
+function selectParkingArea(area) {
+    if (!area) return;
+    selectedArea = area;
+
+    const titleEl = areaPickerTitle || areaName;
+    if (titleEl) titleEl.textContent = area.name;
+
+    if (summaryHours) {
+        summaryHours.textContent = area.operating_hours || "07:00 – 22:00";
+    }
+
+    if (summaryLocation) {
+        summaryLocation.innerHTML = `${escapeHtml(area.location || "Mall Central")} <small>Parking building</small>`;
+    }
+
+    if (floorTabsNav) {
+        floorTabsNav.querySelectorAll(".floor-tab").forEach((tab) => {
+            tab.classList.toggle("active", String(tab.dataset.areaId) === String(area.area_id));
+        });
+    }
+
+    if (areaDropdown) {
+        areaDropdown.querySelectorAll(".area-dropdown-item").forEach((item) => {
+            item.classList.toggle("active", String(item.dataset.areaId) === String(area.area_id));
+        });
+        areaDropdown.hidden = true;
+        if (changeAreaButton) changeAreaButton.setAttribute("aria-expanded", "false");
+    }
+
+    loadFloor(area);
+}
+
+function renderFloorTabs() {
+    if (!floorTabsNav) return;
+    floorTabsNav.replaceChildren();
+
+    areas.forEach((area, index) => {
+        const tab = document.createElement("button");
+        const isActive = selectedArea ? String(selectedArea.area_id) === String(area.area_id) : index === 0;
+        tab.className = "floor-tab" + (isActive ? " active" : "");
+        tab.type = "button";
+        tab.dataset.areaId = area.area_id;
+
+        const shortName = area.name.replace("Mall Central — ", "").replace("Mall Central - ", "");
+        tab.textContent = shortName;
+
+        const badge = document.createElement("span");
+        const lowerName = shortName.toLowerCase();
+        if (lowerName.includes("ground") || shortName === "G") {
+            badge.textContent = "G";
+        } else if (lowerName.includes("first") || shortName === "1") {
+            badge.textContent = "1";
+        } else if (lowerName.includes("second") || shortName === "2") {
+            badge.textContent = "2";
+        } else if (lowerName.includes("third") || shortName === "3") {
+            badge.textContent = "3";
+        } else if (/^\d+$/.test(shortName)) {
+            badge.textContent = shortName;
+        } else {
+            badge.textContent = shortName.charAt(0).toUpperCase();
+        }
+        tab.appendChild(badge);
+
+        tab.addEventListener("click", () => {
+            selectParkingArea(area);
+        });
+
+        floorTabsNav.appendChild(tab);
+    });
+}
+
+function renderAreaDropdown() {
+    if (!areaDropdown) return;
+
+    areaDropdown.innerHTML = areas.map((area) => {
+        const isActive = selectedArea && String(selectedArea.area_id) === String(area.area_id);
+        const availCount = typeof area.available_slots === "number" ? `${area.available_slots} available` : `${area.capacity} slots`;
+        return `
+            <li class="area-dropdown-item${isActive ? " active" : ""}" role="option" data-area-id="${area.area_id}">
+                <div class="area-dropdown-item-header">
+                    <strong>${escapeHtml(area.name)}</strong>
+                    <span class="area-dropdown-badge">${availCount}</span>
+                </div>
+                <div class="area-dropdown-item-sub">${escapeHtml(area.location || "Mall Central")} · ${escapeHtml(area.operating_hours || "07:00 – 22:00")}</div>
+            </li>
+        `;
+    }).join("");
+
+    areaDropdown.querySelectorAll(".area-dropdown-item").forEach((item) => {
+        item.addEventListener("click", () => {
+            const areaId = item.dataset.areaId;
+            const targetArea = areas.find((a) => String(a.area_id) === String(areaId));
+            if (targetArea) {
+                selectParkingArea(targetArea);
+            }
+        });
+    });
+}
+
 async function loadFloor(area) {
     selectedArea = area;
     if (floorTitle) floorTitle.textContent = `Loading ${area.name}`;
@@ -226,7 +329,11 @@ async function loadFloor(area) {
             throw new Error(data.error?.message || "Parking slots could not be loaded.");
         }
         if (data.slots.length === 0) {
-            renderMessage("No slots configured", "This parking floor does not have any configured slots.");
+            if (floorTitle) floorTitle.textContent = area.name;
+            if (areaName) areaName.textContent = area.name;
+            if (areaPickerTitle) areaPickerTitle.textContent = area.name;
+            if (availableCount) availableCount.innerHTML = `0 <small>of ${area.capacity} slots</small>`;
+            renderMessage("No slots configured", `Parking area "${area.name}" has no slots configured yet.`);
             return;
         }
         renderFloor(area, data.slots);
@@ -239,27 +346,8 @@ async function loadFloor(area) {
     }
 }
 
-function setFloorTab(area, index) {
-    const tab = floorTabs[index];
-    if (!tab) {
-        return;
-    }
-    tab.hidden = false;
-    tab.dataset.areaId = area.area_id;
-    tab.textContent = area.name.replace("Mall Central — ", "").replace("Mall Central - ", "");
-    const badge = document.createElement("span");
-    badge.textContent = index === 0 ? "G" : String(index);
-    tab.appendChild(badge);
-    tab.classList.toggle("active", index === 0);
-    tab.addEventListener("click", () => {
-        floorTabs.forEach((item) => item.classList.remove("active"));
-        tab.classList.add("active");
-        loadFloor(area);
-    });
-}
-
 async function loadAreas() {
-    renderMessage("Loading parking floors", "Fetching Mall Central parking areas...");
+    renderMessage("Loading parking floors", "Fetching parking areas...");
     try {
         const response = await fetch(`${API_BASE}/api/parking-areas`);
         const data = await response.json();
@@ -268,16 +356,15 @@ async function loadAreas() {
         }
         areas = data.areas;
         if (areas.length === 0) {
-            renderMessage("No parking floors available", "Mall Central has no active parking areas configured.");
+            renderMessage("No parking floors available", "No active parking areas configured.");
             return;
         }
-        floorTabs.forEach((tab, index) => {
-            tab.hidden = index >= areas.length;
-            if (areas[index]) {
-                setFloorTab(areas[index], index);
-            }
-        });
-        await loadFloor(areas[0]);
+
+        renderFloorTabs();
+        renderAreaDropdown();
+
+        const current = selectedArea ? areas.find((a) => String(a.area_id) === String(selectedArea.area_id)) : null;
+        selectParkingArea(current || areas[0]);
     } catch (error) {
         renderMessage("Parking information unavailable", error.message, '<button class="map-retry" type="button">Try again</button>');
         const retryBtn = parkingMap ? parkingMap.querySelector(".map-retry") : null;
@@ -301,7 +388,18 @@ if (refreshButton) {
 }
 
 if (changeAreaButton) {
-    changeAreaButton.addEventListener("click", () => {
-        window.alert("Mall Central floors are available in the floor selector.");
+    changeAreaButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (!areaDropdown) return;
+        const isHidden = areaDropdown.hidden;
+        areaDropdown.hidden = !isHidden;
+        changeAreaButton.setAttribute("aria-expanded", String(isHidden));
     });
 }
+
+document.addEventListener("click", (event) => {
+    if (areaDropdown && !areaDropdown.hidden && !event.target.closest("#areaDropdownWrapper")) {
+        areaDropdown.hidden = true;
+        if (changeAreaButton) changeAreaButton.setAttribute("aria-expanded", "false");
+    }
+});

@@ -216,7 +216,9 @@ RESERVATION_NOT_FOUND`.
 Checks in the authenticated owner's confirmed reservation and atomically
 creates an active parking session, records the entry time, marks the
 reservation active, and marks the slot occupied. Check-in is available from
-the reservation start time up to (but not including) its end time. Slots or
+the reservation start time through 5 minutes after it starts. If check-in is
+attempted later, the reservation is cancelled, the slot is released when
+available, and a cancellation notification is created. Slots or
 areas that are unavailable, or slots with maintenance overlapping the
 remaining reservation time, cannot be checked into.
 The client confirms the full booked-slot charge and overtime rule before
@@ -226,7 +228,8 @@ Returns `201 Created` with a `session` containing the session, vehicle, slot,
 area, entry time, and reservation end time. Unknown or unowned reservations
 return `404 RESERVATION_NOT_FOUND`. Check-in before the reservation begins,
 after it ends, for a non-confirmed reservation, or when the vehicle/slot is
-unavailable returns `409` with a specific error code.
+unavailable returns `409` with a specific error code. A late cancellation
+returns `409 RESERVATION_CANCELLED_LATE`.
 
 ### `GET /api/parking-sessions/active`
 
