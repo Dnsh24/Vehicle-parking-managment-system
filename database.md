@@ -102,6 +102,7 @@ that a vehicle and a parking slot can each have at most one active assignment.
 | `vehicle_id` | `BIGINT` | `NOT NULL`; FK to `vehicles.vehicle_id`, `ON DELETE RESTRICT` | Parked vehicle |
 | `slot_id` | `BIGINT` | `NOT NULL`; FK to `parking_slots.slot_id`, `ON DELETE RESTRICT` | Occupied slot |
 | `parked_at` | `TIMESTAMPTZ` | `NOT NULL`, default `CURRENT_TIMESTAMP` | Parking start |
+| `scheduled_end` | `TIMESTAMPTZ` | `NOT NULL`; must be after `parked_at` | Planned end of an immediate parking stay |
 | `checkout_at` | `TIMESTAMPTZ` | Nullable; not before `parked_at` | Checkout time |
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL`, default `CURRENT_TIMESTAMP` | Record creation |
 

@@ -4,7 +4,9 @@
 #include "api/parking_responses.h"
 #include "api/vehicle_responses.h"
 #include "api/session_responses.h"
+#include "database/parking_fees.h"
 #include <algorithm>
+#include <cmath>
 #include "validation/validation.h"
 
 #include <iostream>
@@ -192,11 +194,24 @@ void registerVehicleRoutes(crow::App<crow::CORSHandler> &app, Database &database
             {
                 return api::errorResponse(400, "INVALID_SLOT_ID", "slot_id must be a positive integer.");
             }
+            if (!body.has("duration_minutes") ||
+                body["duration_minutes"].t() != crow::json::type::Number ||
+                (body["duration_minutes"].nt() != crow::json::num_type::Signed_integer &&
+                 body["duration_minutes"].nt() != crow::json::num_type::Unsigned_integer) ||
+                body["duration_minutes"].i() <= 0 ||
+                body["duration_minutes"].i() > 10080)
+            {
+                return api::errorResponse(
+                    400,
+                    "INVALID_STAY_DURATION",
+                    "duration_minutes must be a whole number between 1 and 10080.");
+            }
             const std::int64_t slot_id = body["slot_id"].i();
             const VehicleParkingResult result = database.parkVehicle(
                 user->user_id,
                 vehicle_id,
-                slot_id);
+                slot_id,
+                static_cast<int>(body["duration_minutes"].i()));
             if (result.status == VehicleParkingStatus::vehicle_not_found)
             {
                 return api::errorResponse(404, "VEHICLE_NOT_FOUND", "The requested vehicle does not exist.");
@@ -214,6 +229,7 @@ void registerVehicleRoutes(crow::App<crow::CORSHandler> &app, Database &database
             response["parking"]["slot_number"] = result.slot_number;
             response["parking"]["area_name"] = result.area_name;
             response["parking"]["parked_at"] = result.parked_at;
+            response["parking"]["scheduled_end"] = result.scheduled_end;
             return crow::response(201, response);
         }
         catch (const pqxx::unique_violation &)
@@ -257,15 +273,19 @@ void registerVehicleRoutes(crow::App<crow::CORSHandler> &app, Database &database
 
             // Check if vehicle has an active direct parking assignment
             const pqxx::result assign_rows = database.executeRead(
+                "WITH times AS (SELECT clock_timestamp() AS now) "
                 "SELECT a.assignment_id, a.slot_id, ps.slot_number, ps.slot_type, ps.area_id, "
                 "pa.name AS area_name, pa.location, "
                 "v.registration_number, v.vehicle_type, "
                 "to_char(a.parked_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS entry_time_str, "
-                "to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS exit_time_str, "
-                "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (clock_timestamp() - a.parked_at)) / 60.0)::INTEGER) AS duration_minutes, "
-                "COALESCE(pr.hourly_rate, 40.00) AS hourly_rate, "
-                "COALESCE(pr.overstay_rate, 60.00) AS overstay_rate "
+                "to_char(times.now AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS exit_time_str, "
+                "to_char(a.scheduled_end AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS scheduled_end_str, "
+                "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (times.now - a.parked_at)) / 60.0)::INTEGER) AS duration_minutes, "
+                "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (a.scheduled_end - a.parked_at)) / 60.0)::INTEGER) AS planned_duration_minutes, "
+                "GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (times.now - a.scheduled_end - INTERVAL '7 minutes')))::INTEGER) AS overtime_duration_seconds, "
+                "COALESCE(pr.hourly_rate, 40.00) AS hourly_rate "
                 "FROM parking_assignments a "
+                "CROSS JOIN times "
                 "JOIN vehicles v ON v.vehicle_id = a.vehicle_id "
                 "JOIN parking_slots ps ON ps.slot_id = a.slot_id "
                 "JOIN parking_areas pa ON pa.area_id = ps.area_id "
@@ -281,10 +301,12 @@ void registerVehicleRoutes(crow::App<crow::CORSHandler> &app, Database &database
 
             const auto &row = assign_rows[0];
             const int duration_minutes = row["duration_minutes"].as<int>();
-            const int billed_hours = std::max(1, (duration_minutes + 59) / 60);
             const double hourly_rate = row["hourly_rate"].as<double>();
-            const double overstay_rate = row["overstay_rate"].as<double>();
-            const double base_fee = billed_hours * hourly_rate;
+            const int overtime_duration_seconds = row["overtime_duration_seconds"].as<int>();
+            const parking::fees::Breakdown fee = parking::fees::calculate(
+                row["planned_duration_minutes"].as<int>(),
+                overtime_duration_seconds,
+                hourly_rate);
 
             api::SessionFeeSummaryData summary;
             summary.session_id = 0;
@@ -298,16 +320,17 @@ void registerVehicleRoutes(crow::App<crow::CORSHandler> &app, Database &database
             summary.location = row["location"].as<std::string>();
             summary.entry_time = row["entry_time_str"].as<std::string>();
             summary.exit_time = row["exit_time_str"].as<std::string>();
-            summary.reserved_end_time = "";
+            summary.reserved_end_time = row["scheduled_end_str"].as<std::string>();
             summary.duration_minutes = duration_minutes;
-            summary.billed_hours = billed_hours;
-            summary.overstay_duration_minutes = 0;
-            summary.billed_overstay_hours = 0;
+            summary.billed_hours = fee.billed_hours;
+            summary.billed_overtime_minutes = fee.billed_overtime_minutes;
+            summary.overtime_duration_seconds = overtime_duration_seconds;
+            summary.grace_buffer_minutes = parking::fees::free_buffer_minutes;
             summary.hourly_rate = hourly_rate;
-            summary.overstay_rate = overstay_rate;
-            summary.base_fee = base_fee;
-            summary.overstay_fee = 0.0;
-            summary.total_fee = base_fee;
+            summary.overtime_rate_per_minute = parking::fees::overtime_rate_per_minute;
+            summary.base_fee = fee.base_fee;
+            summary.overstay_fee = fee.overtime_fee;
+            summary.total_fee = fee.total_fee;
             summary.payment_status = "unpaid";
             summary.session_status = "active";
 
@@ -364,15 +387,19 @@ void registerVehicleRoutes(crow::App<crow::CORSHandler> &app, Database &database
 
             // Otherwise checkout from direct parking_assignments
             const pqxx::result assign_rows = database.executeRead(
+                "WITH times AS (SELECT clock_timestamp() AS now) "
                 "SELECT a.assignment_id, a.slot_id, ps.slot_number, ps.slot_type, ps.area_id, "
                 "pa.name AS area_name, pa.location, "
                 "v.registration_number, v.vehicle_type, "
                 "to_char(a.parked_at AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS entry_time_str, "
-                "to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS exit_time_str, "
-                "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (clock_timestamp() - a.parked_at)) / 60.0)::INTEGER) AS duration_minutes, "
-                "COALESCE(pr.hourly_rate, 40.00) AS hourly_rate, "
-                "COALESCE(pr.overstay_rate, 60.00) AS overstay_rate "
+                "to_char(times.now AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS exit_time_str, "
+                "to_char(a.scheduled_end AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS scheduled_end_str, "
+                "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (times.now - a.parked_at)) / 60.0)::INTEGER) AS duration_minutes, "
+                "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (a.scheduled_end - a.parked_at)) / 60.0)::INTEGER) AS planned_duration_minutes, "
+                "GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (times.now - a.scheduled_end - INTERVAL '7 minutes')))::INTEGER) AS overtime_duration_seconds, "
+                "COALESCE(pr.hourly_rate, 40.00) AS hourly_rate "
                 "FROM parking_assignments a "
+                "CROSS JOIN times "
                 "JOIN vehicles v ON v.vehicle_id = a.vehicle_id "
                 "JOIN parking_slots ps ON ps.slot_id = a.slot_id "
                 "JOIN parking_areas pa ON pa.area_id = ps.area_id "
@@ -391,10 +418,12 @@ void registerVehicleRoutes(crow::App<crow::CORSHandler> &app, Database &database
             const std::int64_t area_id = row["area_id"].as<std::int64_t>();
             const std::string exit_time_str = row["exit_time_str"].as<std::string>();
             const int duration_minutes = row["duration_minutes"].as<int>();
-            const int billed_hours = std::max(1, (duration_minutes + 59) / 60);
             const double hourly_rate = row["hourly_rate"].as<double>();
-            const double base_fee = billed_hours * hourly_rate;
-            const double total_fee = base_fee;
+            const int overtime_duration_seconds = row["overtime_duration_seconds"].as<int>();
+            const parking::fees::Breakdown fee = parking::fees::calculate(
+                row["planned_duration_minutes"].as<int>(),
+                overtime_duration_seconds,
+                hourly_rate);
 
             database.executeWrite(
                 "UPDATE parking_assignments SET checkout_at = CURRENT_TIMESTAMP "
@@ -425,16 +454,17 @@ void registerVehicleRoutes(crow::App<crow::CORSHandler> &app, Database &database
             summary.location = row["location"].as<std::string>();
             summary.entry_time = row["entry_time_str"].as<std::string>();
             summary.exit_time = exit_time_str;
-            summary.reserved_end_time = "";
+            summary.reserved_end_time = row["scheduled_end_str"].as<std::string>();
             summary.duration_minutes = duration_minutes;
-            summary.billed_hours = billed_hours;
-            summary.overstay_duration_minutes = 0;
-            summary.billed_overstay_hours = 0;
+            summary.billed_hours = fee.billed_hours;
+            summary.billed_overtime_minutes = fee.billed_overtime_minutes;
+            summary.overtime_duration_seconds = overtime_duration_seconds;
+            summary.grace_buffer_minutes = parking::fees::free_buffer_minutes;
             summary.hourly_rate = hourly_rate;
-            summary.overstay_rate = row["overstay_rate"].as<double>();
-            summary.base_fee = base_fee;
-            summary.overstay_fee = 0.0;
-            summary.total_fee = total_fee;
+            summary.overtime_rate_per_minute = parking::fees::overtime_rate_per_minute;
+            summary.base_fee = fee.base_fee;
+            summary.overstay_fee = fee.overtime_fee;
+            summary.total_fee = fee.total_fee;
             summary.payment_status = payment_action;
             summary.session_status = "completed";
 

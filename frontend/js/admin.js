@@ -171,6 +171,10 @@ async function loadAdminUsers() {
                                     data-user-id="${u.user_id}" data-active="${u.is_active}">
                                     ${u.is_active ? 'Deactivate' : 'Activate'}
                                 </button>
+                                <button type="button" class="danger admin-user-delete-btn"
+                                    data-user-id="${u.user_id}" data-username="${escapeHtml(u.username)}">
+                                    Delete permanently
+                                </button>
                             `}
                         </div>
                     </td>
@@ -201,12 +205,29 @@ if (adminUsersList) {
 
     adminUsersList.addEventListener("click", async (event) => {
         const button = event.target.closest(".admin-user-status-btn");
-        if (!button) return;
-        const userId = button.dataset.userId;
-        const currentlyActive = button.dataset.active === "true";
+        if (button) {
+            const userId = button.dataset.userId;
+            const currentlyActive = button.dataset.active === "true";
+            try {
+                await adminApiCall(`/api/admin/users/${encodeURIComponent(userId)}/status`, "PUT", { is_active: !currentlyActive });
+                setAdminMessage(adminUsersMessage, `Account #${userId} ${!currentlyActive ? "activated" : "deactivated"}.`);
+                await loadAdminUsers();
+            } catch (error) {
+                setAdminMessage(adminUsersMessage, error.message, true);
+            }
+            return;
+        }
+
+        const deleteButton = event.target.closest(".admin-user-delete-btn");
+        if (!deleteButton) return;
+        const userId = deleteButton.dataset.userId;
+        const username = deleteButton.dataset.username;
+        if (!confirm(`Permanently delete account #${userId} (${username}) and its past parking and payment history? This cannot be undone. Accounts with future reservations or active parking cannot be deleted.`)) {
+            return;
+        }
         try {
-            await adminApiCall(`/api/admin/users/${encodeURIComponent(userId)}/status`, "PUT", { is_active: !currentlyActive });
-            setAdminMessage(adminUsersMessage, `Account #${userId} ${!currentlyActive ? "activated" : "deactivated"}.`);
+            await adminApiCall(`/api/admin/users/${encodeURIComponent(userId)}`, "DELETE");
+            setAdminMessage(adminUsersMessage, `Permanently deleted account #${userId}.`);
             await loadAdminUsers();
         } catch (error) {
             setAdminMessage(adminUsersMessage, error.message, true);
@@ -740,4 +761,3 @@ if (adminMaintenanceListEl) {
         }
     });
 }
-

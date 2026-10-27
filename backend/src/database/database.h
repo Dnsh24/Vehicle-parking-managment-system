@@ -22,6 +22,14 @@ enum class VehicleDeletionResult
     currently_parked
 };
 
+enum class UserDeletionResult
+{
+    deleted,
+    not_found,
+    future_reservation,
+    active_activity
+};
+
 enum class ReservationCreationStatus
 {
     created,
@@ -90,6 +98,7 @@ struct VehicleParkingResult
     std::string slot_number;
     std::string area_name;
     std::string parked_at;
+    std::string scheduled_end;
 };
 
 class Database
@@ -103,6 +112,7 @@ public:
     VehicleDeletionResult deleteVehicleAndHistory(
         std::int64_t vehicle_id,
         std::int64_t user_id) const;
+    UserDeletionResult deleteUserWithoutFutureActivity(std::int64_t user_id) const;
     ReservationCreationResult createReservation(
         std::int64_t user_id,
         std::int64_t vehicle_id,
@@ -125,7 +135,8 @@ public:
     VehicleParkingResult parkVehicle(
         std::int64_t user_id,
         std::int64_t vehicle_id,
-        std::int64_t slot_id) const;
+        std::int64_t slot_id,
+        int planned_duration_minutes) const;
 
 private:
     pqxx::connection createConnection() const;
