@@ -26,6 +26,8 @@ find_package(libpqxx CONFIG REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 add_executable(parking_backend
+    src/application/application.cpp
+    src/application/application.h
     src/main.cpp
     src/auth/auth.cpp
     src/auth/auth.h

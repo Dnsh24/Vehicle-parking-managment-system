@@ -11,7 +11,14 @@
 namespace routes
 {
 
-void registerAdminRoutes(crow::App<crow::CORSHandler> &app, Database &database);
+class AdminRoutes
+{
+public:
+    explicit AdminRoutes(Database &database);
+    void registerRoutes(crow::App<crow::CORSHandler> &app);
+
+private:
+    Database &database_;
+};
 
 } // namespace routes
-

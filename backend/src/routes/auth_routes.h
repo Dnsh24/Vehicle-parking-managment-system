@@ -11,7 +11,14 @@
 namespace routes
 {
 
-void registerAuthRoutes(crow::App<crow::CORSHandler> &app, Database &database);
+class AuthRoutes
+{
+public:
+    explicit AuthRoutes(Database &database);
+    void registerRoutes(crow::App<crow::CORSHandler> &app);
+
+private:
+    Database &database_;
+};
 
 } // namespace routes
-

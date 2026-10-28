@@ -142,10 +142,12 @@ crow::json::wvalue parkingSessionJson(const Row &row)
 namespace routes
 {
 
-void registerReservationRoutes(
-    crow::App<crow::CORSHandler> &app,
-    Database &database)
+ReservationRoutes::ReservationRoutes(Database &database) : database_(database) {}
+
+void ReservationRoutes::registerRoutes(
+    crow::App<crow::CORSHandler> &app)
 {
+    Database &database = database_;
     CROW_ROUTE(app, "/api/reservations/availability")
         .methods(crow::HTTPMethod::GET)
     ([&database](const crow::request &request)

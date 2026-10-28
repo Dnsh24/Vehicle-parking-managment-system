@@ -15,8 +15,11 @@
 namespace routes
 {
 
-void registerVehicleRoutes(crow::App<crow::CORSHandler> &app, Database &database)
+VehicleRoutes::VehicleRoutes(Database &database) : database_(database) {}
+
+void VehicleRoutes::registerRoutes(crow::App<crow::CORSHandler> &app)
 {
+    Database &database = database_;
     CROW_ROUTE(app, "/api/vehicles").methods(crow::HTTPMethod::GET)
     ([&database](const crow::request &request)
      {

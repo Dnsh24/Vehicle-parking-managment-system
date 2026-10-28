@@ -263,7 +263,11 @@ async function autoGenerateSlotsForArea(areaId, areaName, capacity) {
         let slotType = "standard";
         let isEv = false;
 
-        if (i <= Math.max(1, Math.floor(count * 0.1))) {
+        if (count <= 2) {
+            // Small new areas must still offer a standard car space.
+            vehicleType = "car";
+            slotType = "standard";
+        } else if (i <= Math.max(1, Math.floor(count * 0.1))) {
             vehicleType = "truck";
             slotType = "truck";
         } else if (i <= Math.max(2, Math.floor(count * 0.35))) {
@@ -291,13 +295,20 @@ async function autoGenerateSlotsForArea(areaId, areaName, capacity) {
         });
     }
 
+    const failedSlots = [];
     for (const slot of slots) {
         try {
             await adminApiCall(`/api/admin/parking-areas/${encodeURIComponent(areaId)}/slots`, "POST", slot);
-        } catch (e) {
-            console.warn(`Could not add slot ${slot.slot_number}:`, e);
+        } catch (error) {
+            console.warn(`Could not add slot ${slot.slot_number}:`, error);
+            failedSlots.push(slot.slot_number);
         }
     }
+    return {
+        requested: slots.length,
+        created: slots.length - failedSlots.length,
+        failedSlots
+    };
 }
 
 async function loadAdminAreas() {
@@ -352,24 +363,32 @@ if (adminAreaForm) {
         if (lng) payload.longitude = Number(lng);
 
         try {
+            let completionMessage = "";
+            let completionIsError = false;
             if (areaId) {
                 await adminApiCall(`/api/admin/parking-areas/${encodeURIComponent(areaId)}`, "PUT", payload);
-                setAdminMessage(adminAreasMessage, `Area #${areaId} updated successfully.`);
+                completionMessage = `Area #${areaId} updated successfully.`;
             } else {
                 const res = await adminApiCall("/api/admin/parking-areas", "POST", payload);
                 const newAreaId = res?.area?.area_id || res?.area_id;
                 const autoGen = formData.get("auto_generate_slots") === "on";
                 if (autoGen && payload.capacity > 0 && newAreaId) {
                     setAdminMessage(adminAreasMessage, `Area created. Generating ${payload.capacity} slots...`);
-                    await autoGenerateSlotsForArea(newAreaId, payload.name, payload.capacity);
-                    setAdminMessage(adminAreasMessage, `New parking area and ${payload.capacity} slots created successfully!`);
+                    const result = await autoGenerateSlotsForArea(newAreaId, payload.name, payload.capacity);
+                    if (result.failedSlots.length > 0) {
+                        completionIsError = true;
+                        completionMessage = `Area created with ${result.created} of ${result.requested} slots. Failed slots: ${result.failedSlots.join(", ")}. Add or retry them in Parking Slots.`;
+                    } else {
+                        completionMessage = `New parking area and ${result.created} slots created successfully!`;
+                    }
                 } else {
-                    setAdminMessage(adminAreasMessage, "New parking area created.");
+                    completionMessage = "New parking area created. Add parking slots before vehicles can park there.";
                 }
             }
             resetAreaForm();
             await loadAdminAreas();
             if (typeof loadAreas === "function") await loadAreas();
+            if (completionMessage) setAdminMessage(adminAreasMessage, completionMessage, completionIsError);
         } catch (error) {
             setAdminMessage(adminAreasMessage, error.message, true);
         }

@@ -9,8 +9,11 @@
 namespace routes
 {
 
-void registerAuthRoutes(crow::App<crow::CORSHandler> &app, Database &database)
+AuthRoutes::AuthRoutes(Database &database) : database_(database) {}
+
+void AuthRoutes::registerRoutes(crow::App<crow::CORSHandler> &app)
 {
+    Database &database = database_;
     CROW_ROUTE(app, "/api/auth/register").methods(crow::HTTPMethod::POST)
     ([&database](const crow::request &request)
      {

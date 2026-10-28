@@ -18,8 +18,7 @@ parking history, and in-app notifications.
 | Reservations and sessions | Availability filters, transactional booking/check-in, owner-scoped listing/details, cancellation, and active-session listing |
 | Administrator management | Users, areas, slots, rates, and maintenance operations implemented |
 
-The database tables are not API resources until backend routes and operations
-are implemented for them.
+The SQL schema is maintained in `database/schema.sql`; a table is exposed through this API only when its route and operation are implemented.
 
 ## Implemented endpoints
 
