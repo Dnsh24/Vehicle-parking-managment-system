@@ -106,14 +106,6 @@ VehicleDeletionResult Database::deleteVehicleAndHistory(
     }
 
     transaction.exec_params(
-        "DELETE FROM receipts "
-        "WHERE reservation_id IN (SELECT reservation_id FROM reservations WHERE vehicle_id = $1) "
-        "OR session_id IN (SELECT session_id FROM parking_sessions WHERE vehicle_id = $1) "
-        "OR payment_id IN (SELECT payment_id FROM payments "
-        "WHERE reservation_id IN (SELECT reservation_id FROM reservations WHERE vehicle_id = $1) "
-        "OR session_id IN (SELECT session_id FROM parking_sessions WHERE vehicle_id = $1))",
-        vehicle_id);
-    transaction.exec_params(
         "DELETE FROM payments "
         "WHERE reservation_id IN (SELECT reservation_id FROM reservations WHERE vehicle_id = $1) "
         "OR session_id IN (SELECT session_id FROM parking_sessions WHERE vehicle_id = $1)",
@@ -189,17 +181,6 @@ UserDeletionResult Database::deleteUserWithoutFutureActivity(std::int64_t user_i
         return UserDeletionResult::active_activity;
     }
 
-    transaction.exec_params(
-        "DELETE FROM receipts "
-        "WHERE reservation_id IN ("
-        "SELECT reservation_id FROM reservations "
-        "WHERE user_id = $1 OR vehicle_id IN "
-        "(SELECT vehicle_id FROM vehicles WHERE user_id = $1)) "
-        "OR session_id IN ("
-        "SELECT session_id FROM parking_sessions "
-        "WHERE user_id = $1 OR vehicle_id IN "
-        "(SELECT vehicle_id FROM vehicles WHERE user_id = $1))",
-        user_id);
     transaction.exec_params(
         "DELETE FROM payments "
         "WHERE user_id = $1 "
@@ -383,6 +364,64 @@ ReservationCheckInResult Database::checkInReservation(
 
     const std::int64_t vehicle_id = reservation[0]["vehicle_id"].as<std::int64_t>();
     const std::int64_t slot_id = reservation[0]["slot_id"].as<std::int64_t>();
+    const pqxx::result window = transaction.exec_params(
+        "SELECT statement_timestamp() < $1::timestamptz AS too_early, "
+        "statement_timestamp() > $1::timestamptz + make_interval(mins => $3) AS late, "
+        "statement_timestamp() >= $2::timestamptz AS expired",
+        reservation[0]["start_time"].as<std::string>(),
+        reservation[0]["end_time"].as<std::string>(),
+        parking::reservations::check_in_grace_minutes);
+    if (window[0]["too_early"].as<bool>())
+    {
+        return {ReservationCheckInStatus::too_early};
+    }
+    if (window[0]["late"].as<bool>())
+    {
+        transaction.exec_params(
+            "UPDATE reservations SET status = 'cancelled' "
+            "WHERE reservation_id = $1 AND user_id = $2 AND status = 'confirmed'",
+            reservation_id,
+            user_id);
+        transaction.exec_params(
+            "UPDATE parking_slots ps SET status = CASE "
+            "WHEN EXISTS (SELECT 1 FROM maintenance m "
+            "WHERE m.slot_id = ps.slot_id AND m.status IN ('scheduled', 'in_progress') "
+            "AND m.start_time <= statement_timestamp() "
+            "AND (m.end_time IS NULL OR m.end_time > statement_timestamp())) THEN 'maintenance' "
+            "WHEN EXISTS (SELECT 1 FROM parking_assignments a "
+            "WHERE a.slot_id = ps.slot_id AND a.checkout_at IS NULL) "
+            "OR EXISTS (SELECT 1 FROM parking_sessions s "
+            "WHERE s.slot_id = ps.slot_id AND s.exit_time IS NULL "
+            "AND s.status IN ('active', 'overstayed')) THEN 'occupied' "
+            "WHEN EXISTS (SELECT 1 FROM reservations r "
+            "WHERE r.slot_id = ps.slot_id AND r.reservation_id <> $2 "
+            "AND r.status IN ('confirmed', 'active') "
+            "AND r.start_time <= statement_timestamp() "
+            "AND r.end_time > statement_timestamp()) THEN 'reserved' "
+            "ELSE 'available' END "
+            "WHERE ps.slot_id = $1",
+            slot_id,
+            reservation_id);
+        transaction.exec_params(
+            "INSERT INTO notifications (user_id, title, message, type) "
+            "VALUES ($1, 'Reservation cancelled', "
+            "'Reservation #' || $2::text || ' was cancelled because check-in was not completed within 5 minutes of its start time.', "
+            "'reservation_cancelled')",
+            user_id,
+            reservation_id);
+        transaction.commit();
+        return {ReservationCheckInStatus::late_cancelled};
+    }
+    if (window[0]["expired"].as<bool>())
+    {
+        transaction.exec_params(
+            "UPDATE reservations SET status = 'expired' "
+            "WHERE reservation_id = $1 AND status = 'confirmed'",
+            reservation_id);
+        transaction.commit();
+        return {ReservationCheckInStatus::expired};
+    }
+
     const pqxx::result vehicle = transaction.exec_params(
         "SELECT needs_accessible_parking FROM vehicles WHERE vehicle_id = $1 FOR UPDATE",
         vehicle_id);
@@ -407,25 +446,6 @@ ReservationCheckInResult Database::checkInReservation(
          !vehicle[0]["needs_accessible_parking"].as<bool>()))
     {
         return {ReservationCheckInStatus::slot_unavailable};
-    }
-
-    const pqxx::result window = transaction.exec_params(
-        "SELECT statement_timestamp() < $1::timestamptz AS too_early, "
-        "statement_timestamp() >= $2::timestamptz AS expired",
-        reservation[0]["start_time"].as<std::string>(),
-        reservation[0]["end_time"].as<std::string>());
-    if (window[0]["too_early"].as<bool>())
-    {
-        return {ReservationCheckInStatus::too_early};
-    }
-    if (window[0]["expired"].as<bool>())
-    {
-        transaction.exec_params(
-            "UPDATE reservations SET status = 'expired' "
-            "WHERE reservation_id = $1 AND status = 'confirmed'",
-            reservation_id);
-        transaction.commit();
-        return {ReservationCheckInStatus::expired};
     }
 
     const pqxx::result conflicts = transaction.exec_params(
@@ -603,8 +623,11 @@ VehicleParkingResult Database::parkVehicle(
         "UPDATE parking_slots SET status = 'occupied' WHERE slot_id = $1",
         slot_id);
     const pqxx::result assignment = transaction.exec_params(
-        "INSERT INTO parking_assignments (user_id, vehicle_id, slot_id, scheduled_end) "
-        "VALUES ($1, $2, $3, clock_timestamp() + make_interval(mins => $4)) "
+        "WITH parking_start AS (SELECT clock_timestamp() AS parked_at) "
+        "INSERT INTO parking_assignments (user_id, vehicle_id, slot_id, parked_at, scheduled_end) "
+        "SELECT $1, $2, $3, parking_start.parked_at, "
+        "parking_start.parked_at + make_interval(mins => $4) "
+        "FROM parking_start "
         "RETURNING assignment_id, to_char(parked_at AT TIME ZONE 'UTC', "
         "'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS parked_at, "
         "to_char(scheduled_end AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS scheduled_end",
@@ -637,7 +660,7 @@ SessionExitResult Database::exitParkingSession(
         "s.entry_time, "
         "r.start_time AS reserved_start_time, "
         "r.end_time AS reserved_end_time, "
-        "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (r.end_time - r.start_time)) / 60.0)::INTEGER) "
+        "GREATEST(1, FLOOR(EXTRACT(EPOCH FROM (r.end_time - r.start_time)) / 60.0)::INTEGER) "
         "AS booked_duration_minutes, "
         "to_char(s.entry_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS entry_time_str, "
         "to_char(r.end_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS reserved_end_time_str, "
@@ -863,7 +886,7 @@ std::optional<api::SessionFeeSummaryData> Database::getSessionFeeSummary(
         "to_char(s.entry_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS entry_time_str, "
         "to_char(s.exit_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS exit_time_str, "
         "to_char(r.end_time AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS reserved_end_time_str, "
-        "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (r.end_time - r.start_time)) / 60.0)::INTEGER) "
+        "GREATEST(1, FLOOR(EXTRACT(EPOCH FROM (r.end_time - r.start_time)) / 60.0)::INTEGER) "
         "AS booked_duration_minutes, "
         "CASE WHEN s.exit_time IS NULL THEN 0 ELSE GREATEST(0, FLOOR(EXTRACT(EPOCH FROM "
         "(s.exit_time - r.end_time - INTERVAL '7 minutes')))::INTEGER) END AS overtime_duration_seconds, "

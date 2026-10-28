@@ -13,6 +13,7 @@ function setVehicleMessage(message, isError = false) {
     if (!vehicleMessage) return;
     vehicleMessage.textContent = message;
     vehicleMessage.classList.toggle("is-error", isError);
+    if (message && isError) showAppNotice(message, "error");
 }
 
 function resetVehicleForm() {
@@ -138,8 +139,10 @@ if (vehicleForm) {
             resetVehicleForm();
             await loadVehicles();
             setVehicleMessage(vehicleId ? "Vehicle updated." : "Vehicle added.");
+            if (vehicleId) showAppNotice("Vehicle updated successfully.");
             if (!vehicleId && data.vehicle?.vehicle_id) {
                 if (afterAddAction === "park") {
+                    showAppNotice("Vehicle added. Choose an available slot to park.");
                     await showAvailableSlots(data.vehicle.vehicle_id);
                 } else {
                     if (reservationVehicle) {
@@ -151,7 +154,10 @@ if (vehicleForm) {
                         reservationSearchForm.elements.start_time.focus({ preventScroll: true });
                     }
                     setVehicleMessage("Vehicle added. Choose a reservation time and search for a slot.");
+                    showAppNotice("Vehicle added. Choose your reservation time to continue.");
                 }
+            } else if (!vehicleId) {
+                showAppNotice("Vehicle added successfully.");
             }
         } catch (error) {
             setVehicleMessage(error.message, true);
@@ -209,7 +215,10 @@ if (vehicleList) {
             return;
         }
 
-        if (!window.confirm("Permanently delete this vehicle and its associated parking, reservation, payment, receipt, and history records? This cannot be undone.")) {
+        if (!await showAppConfirm("Permanently delete this vehicle and its associated parking, reservation, payment, receipt, and history records? This cannot be undone.", {
+            title: "Delete vehicle",
+            acceptLabel: "Delete vehicle"
+        })) {
             return;
         }
         try {
@@ -222,6 +231,7 @@ if (vehicleList) {
                 throw new Error(data.error?.message || "The vehicle could not be deleted.");
             }
             setVehicleMessage("Vehicle deleted.");
+            showAppNotice("Vehicle and its history were deleted.");
             await loadVehicles();
         } catch (error) {
             setVehicleMessage(error.message, true);
@@ -372,31 +382,58 @@ async function parkVehicleInSlot(vehicleId, slotId) {
         );
         const data = await response.json();
         if (!response.ok) {
+            if (data.error?.code === "PARKING_SLOT_UNAVAILABLE") {
+                if (selectedElement) selectedElement.removeAttribute("aria-disabled");
+                slotSelection = null;
+                applySlotSelection();
+                vehicleList
+                    ?.querySelector(`[data-vehicle-id="${CSS.escape(String(vehicleId))}"] .available-slot-options`)
+                    ?.remove();
+                if (selectedArea) await loadFloor(selectedArea);
+                await loadVehicles();
+                const refreshedCard = vehicleList?.querySelector(
+                    `[data-vehicle-id="${CSS.escape(String(vehicleId))}"]`
+                );
+                if (refreshedCard?.querySelector('[data-action="checkout"]')) {
+                    setVehicleMessage("This vehicle is already parked. Your vehicle list has been refreshed.");
+                } else {
+                    await showAvailableSlots(vehicleId);
+                    setVehicleMessage("That slot was taken or became unavailable. The available choices have been refreshed.");
+                }
+                return;
+            }
             throw new Error(data.error?.message || "The vehicle could not be parked in this slot.");
         }
+
         slotSelection = null;
-        await loadVehicles();
-        setVehicleMessage(
-            `Vehicle parked at ${data.parking.area_name} · ${data.parking.slot_number}; planned until ${formatIsoTimestamp(data.parking.scheduled_end)}.`
+        const confirmation = `Vehicle parked at ${data.parking.area_name} / ${data.parking.slot_number}; planned until ${formatIsoTimestamp(data.parking.scheduled_end)}.`;
+        setVehicleMessage(confirmation);
+        showAppNotice(
+            `Parking confirmed for ${data.parking.slot_number}. Your planned stay ends at ${formatIsoTimestamp(data.parking.scheduled_end)}.`
         );
-        const parkingArea = areas.find((area) => String(area.area_id) === String(data.parking.area_id));
-        if (parkingArea) {
-            selectedArea = parkingArea;
-            floorTabs.forEach((tab) => {
-                tab.classList.toggle("active", String(tab.dataset.areaId) === String(parkingArea.area_id));
-            });
-            await loadFloor(parkingArea);
-            const parkedSlot = parkingMap.querySelector(
-                `[data-slot-id="${CSS.escape(String(data.parking.slot_id))}"]`
-            );
-            if (parkedSlot) {
-                selectSlot(parkedSlot);
+
+        // Parking has committed on the server. Keep UI refresh errors from being
+        // reported as if the parking request itself failed.
+        try {
+            await loadVehicles();
+            const parkingArea = areas.find((area) => String(area.area_id) === String(data.parking.area_id));
+            if (parkingArea) {
+                selectedArea = parkingArea;
+                document.querySelectorAll("#floorTabsNav .floor-tab").forEach((tab) => {
+                    tab.classList.toggle("active", String(tab.dataset.areaId) === String(parkingArea.area_id));
+                });
+                await loadFloor(parkingArea);
+                const parkedSlot = parkingMap.querySelector(
+                    `[data-slot-id="${CSS.escape(String(data.parking.slot_id))}"]`
+                );
+                if (parkedSlot) selectSlot(parkedSlot);
             }
+        } catch (refreshError) {
+            console.warn("Parking succeeded, but the screen could not be refreshed:", refreshError);
+            setVehicleMessage(`${confirmation} Refresh the map to see the updated slot.`);
         }
     } catch (error) {
-        if (selectedElement) {
-            selectedElement.removeAttribute("aria-disabled");
-        }
+        if (selectedElement) selectedElement.removeAttribute("aria-disabled");
         setVehicleMessage(error.message, true);
     }
 }
@@ -536,6 +573,7 @@ async function showVehicleExitModal(vehicleId) {
                 sessionExitDialog.close();
                 const finalFee = checkoutData.session ? ` Total fee: ₹${Number(checkoutData.session.total_fee).toFixed(2)}.` : "";
                 setVehicleMessage(`Vehicle ${summary.registration_number} checked out successfully! Slot ${summary.slot_number} released.${finalFee}`);
+                showAppNotice(`Checkout complete. Slot ${summary.slot_number} is released.${finalFee}`);
 
                 await loadVehicles();
                 if (typeof loadActiveParkingSessions === "function") {
@@ -557,7 +595,7 @@ async function showVehicleExitModal(vehicleId) {
             } catch (err) {
                 confirmBtn.disabled = false;
                 confirmBtn.textContent = "Confirm Exit & Release Slot";
-                alert(err.message);
+                showAppNotice(err.message, "error");
             }
         });
 

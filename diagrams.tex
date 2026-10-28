@@ -1,0 +1,94 @@
+\documentclass[tikz,border=12pt]{standalone}
+\usetikzlibrary{positioning,arrows.meta,calc}
+\usepackage{array}
+
+\newcommand{\UMLClass}[7]{%
+  \node[draw=black, rounded corners=0pt, line width=0.7pt,
+        fill=white, inner sep=0pt, anchor=center] (#1) at (#3,#4) {%
+    \begin{tabular}{@{}>{\centering\arraybackslash}p{#5}@{}}
+      \bfseries\sffamily #2\\\hline
+      \raggedright\arraybackslash\ttfamily\scriptsize #6\\\hline
+      \raggedright\arraybackslash\ttfamily\scriptsize #7
+    \end{tabular}%
+  };
+}
+
+\begin{document}
+
+% System architecture
+\begin{tikzpicture}[
+  font=\small,
+  layer/.style={draw=black, rounded corners=0pt, line width=0.7pt,
+    align=center, text=black, text width=8cm, minimum height=1.15cm, inner sep=7pt},
+  flow/.style={-{Stealth[length=2.7mm]}, line width=0.8pt, draw=black}
+]
+  \node[font=\Large\bfseries\sffamily, text=black] (title) {System Architecture};
+  \node[layer, fill=white, below=8mm of title] (browser)
+    {\textbf{Web Client}\\HTML, CSS, and JavaScript interface};
+  \node[layer, fill=white, below=of browser] (api)
+    {\textbf{HTTP / JSON API}\\Browser requests and backend responses};
+  \node[layer, fill=white, below=of api] (routes)
+    {\textbf{C++20 Crow REST API}\\Authentication, parking, vehicle, reservation, and administrator routes};
+  \node[layer, fill=white, below=of routes] (application)
+    {\textbf{ParkingApplication}\\Application startup, CORS configuration, and route wiring};
+  \node[layer, fill=white, below=of application] (database)
+    {\textbf{Database access}\\C++ database layer using libpqxx};
+  \node[layer, fill=white, below=of database] (postgres)
+    {\textbf{PostgreSQL}\\Persistent parking system data};
+
+  \draw[flow] (browser) -- (api);
+  \draw[flow] (api) -- (routes);
+  \draw[flow] (routes) -- (application);
+  \draw[flow] (application) -- (database);
+  \draw[flow] (database) -- (postgres);
+\end{tikzpicture}
+
+% UML class diagram
+\begin{tikzpicture}[
+  font=\small,
+  composition/.style={-{Diamond[length=3.5mm,width=3.5mm]}, draw=black, line width=0.7pt},
+  association/.style={-{Stealth[length=2.4mm]}, draw=black, line width=0.7pt}
+]
+  \node[font=\Large\bfseries\sffamily, text=black] at (0,10.2)
+    {UML Class Diagram};
+
+  \UMLClass{applicationClass}{ParkingApplication}{0}{7.1}{7.8cm}
+    {- config\_ : BackendConfig\\- database\_ : Database\\- app\_ : Crow application\\- route controller members}
+    {+ run()\\- configureCors()\\- registerRoutes(...) }
+
+  \UMLClass{auth}{AuthRoutes}{-10}{0.9}{4.3cm}
+    {- database\_ : Database\&}
+    {+ AuthRoutes(Database\&)\\+ registerRoutes(app)}
+  \UMLClass{parking}{ParkingRoutes}{-5}{0.9}{4.3cm}
+    {- database\_ : Database\&}
+    {+ ParkingRoutes(Database\&)\\+ registerRoutes(app, check, name)}
+  \UMLClass{vehicle}{VehicleRoutes}{0}{0.9}{4.3cm}
+    {- database\_ : Database\&}
+    {+ VehicleRoutes(Database\&)\\+ registerRoutes(app)}
+  \UMLClass{reservation}{ReservationRoutes}{5}{0.9}{4.3cm}
+    {- database\_ : Database\&}
+    {+ ReservationRoutes(Database\&)\\+ registerRoutes(app)}
+  \UMLClass{admin}{AdminRoutes}{10}{0.9}{4.3cm}
+    {- database\_ : Database\&}
+    {+ AdminRoutes(Database\&)\\+ registerRoutes(app)}
+
+  \UMLClass{databaseClass}{Database}{0}{-5.2}{8.0cm}
+    {- config\_ : BackendConfig}
+    {+ checkConnection()\\+ executeRead() / executeWrite()\\+ parkVehicle()\\+ createReservation() / checkInReservation()\\+ cancelReservation() / exitParkingSession()\\+ getSessionFeeSummary()}
+
+  % Each composition edge has its own path between the class boxes.
+  \draw[composition] (auth.north) -- ($(applicationClass.south west)!0.08!(applicationClass.south east)$);
+  \draw[composition] (parking.north) -- ($(applicationClass.south west)!0.30!(applicationClass.south east)$);
+  \draw[composition] (vehicle.north) -- (applicationClass.south);
+  \draw[composition] (reservation.north) -- ($(applicationClass.south west)!0.70!(applicationClass.south east)$);
+  \draw[composition] (admin.north) -- ($(applicationClass.south west)!0.92!(applicationClass.south east)$);
+
+  % The controllers all hold a reference to the shared Database instance.
+  \draw[association] (auth.south) -- ($(databaseClass.north west)!0.08!(databaseClass.north east)$);
+  \draw[association] (parking.south) -- ($(databaseClass.north west)!0.30!(databaseClass.north east)$);
+  \draw[association] (vehicle.south) -- (databaseClass.north);
+  \draw[association] (reservation.south) -- ($(databaseClass.north west)!0.70!(databaseClass.north east)$);
+  \draw[association] (admin.south) -- ($(databaseClass.north west)!0.92!(databaseClass.north east)$);
+\end{tikzpicture}
+
+\end{document}

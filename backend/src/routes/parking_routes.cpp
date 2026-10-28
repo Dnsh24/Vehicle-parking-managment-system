@@ -9,12 +9,14 @@
 namespace routes
 {
 
-void registerParkingRoutes(
+ParkingRoutes::ParkingRoutes(Database &database) : database_(database) {}
+
+void ParkingRoutes::registerRoutes(
     crow::App<crow::CORSHandler> &app,
-    Database &database,
     const DatabaseCheckResult &database_check,
     const std::string &database_name)
 {
+    Database &database = database_;
     CROW_ROUTE(app, "/api/hello")
     ([]()
      {

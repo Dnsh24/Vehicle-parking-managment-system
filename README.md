@@ -8,8 +8,8 @@ frontend, a C++ backend using Crow, and a PostgreSQL database.
 | Component | Status |
 | --- | --- |
 | Frontend | Authentication, parking availability, vehicles, reservations, active sessions, history, notifications, and administrator management implemented. |
-| PostgreSQL | Schema implemented with 14 core tables, constraints, and indexes; Phase 8 notification indexes are in `database/phase8_history_notifications.sql`. See [database.md](database.md). |
-| C++ backend | Crow server with PostgreSQL access, bearer authentication, transactional reservations and sessions, manual exit billing, history, notifications, and administration. |
+| PostgreSQL | Schema implemented in [`database/schema.sql`](database/schema.sql), with migrations and seed scripts under `database/`. |
+| C++ backend | OOP structure with a `ParkingApplication` composition root, route controller classes, and an encapsulated `Database` layer; provides bearer authentication, transactional reservations and sessions, billing, history, notifications, and administration. |
 | REST API | Health, authentication, profile, parking availability, vehicles, reservations, sessions, history, notifications, and administrator endpoints implemented. |
 | Frontend-backend integration | Browser `fetch` integration targets `http://localhost:3000`; live Phase 8 database end-to-end verification remains. |
 
@@ -26,21 +26,9 @@ features or CRUD operations are implemented.
 - CMake and Ninja-compatible build configuration
 - JSON responses from the Crow routes
 
-## Planned architecture
+## Diagrams
 
-The intended architecture is:
-
-```text
-HTML/CSS/JavaScript frontend
-            |
-        HTTP/JSON
-            v
-       C++ Crow backend
-            |
-          libpqxx
-            v
-       PostgreSQL database
-```
+The TikZ source for the architecture and current OOP class diagrams is [`diagrams.tex`](diagrams.tex); the compiled PDF is [`diagrams-table.pdf`](diagrams-table.pdf).
 
 Authentication, profiles, parking availability, vehicle management, basic
 administrator management and maintenance, reservations, manual check-in and
@@ -82,7 +70,7 @@ reporting remain planned.
 
 ### Database
 
-- Defines the 14 core tables documented in [database.md](database.md).
+- Defines the relational entities, keys, constraints, and indexes in [`database/schema.sql`](database/schema.sql).
 - Uses `pgcrypto` and `gen_random_uuid()` for QR token generation.
 - Defines primary keys, foreign keys, checks, unique constraints, and indexes.
 
@@ -99,44 +87,36 @@ implemented as complete application functionality:
 ## Actual project structure
 
 ```text
-.
-├── README.md
-├── planning.md
-├── API.md
-├── OOPS.md
-├── database.md
-├── backend
-│   ├── CMakeLists.txt
-│   └── src
-│       ├── api
-│       │   └── errors.h
-│       ├── config
-│       │   ├── config.cpp
-│       │   └── config.h
-│       ├── database
-│       │   ├── database.cpp
-│       │   └── database.h
-│       ├── main.cpp
-│       └── validation
-│           ├── validation.cpp
-│           └── validation.h
-│   └── tests
-│       ├── api_tests.cpp
-├── config_tests.cpp
-├── database_tests.cpp
-│       └── validation_tests.cpp
-├── database
-│   └── schema.sql
-└── frontend
-    ├── index.html
-    ├── css
-    │   └── style.css
-    └── js
-        └── app.js
+README.md
+planning.md
+API.md
+OOPS.md
+PROMPTS.md
+diagrams.tex
+backend/
+  CMakeLists.txt
+  src/
+    application/  ParkingApplication lifecycle and dependency wiring
+    api/          Response and error helpers
+    auth/         Password and token utilities
+    config/       Environment configuration
+    database/     Database access and fee calculation
+    routes/       Auth, parking, reservation, vehicle, and admin controllers
+    validation/   Request validation
+    main.cpp      Environment setup and application startup
+  tests/
+    API, auth, config, database, admin, validation, and fee tests
+database/
+  schema.sql
+  phase migrations and development seeds
+frontend/
+  index.html
+  css/
+  js/
+  assets/
 ```
 
-The repository also contains generated files under `backend/build/`. They are
-build artifacts rather than source files and are omitted from the tree above.
+Build output under `backend/build/` is generated and omitted from the source tree.
 
 ## Setup and running
 
@@ -154,7 +134,7 @@ Create a PostgreSQL database named `parking_management`, then run:
 psql -U <user> -d parking_management -f database/schema.sql
 ```
 
-The schema file creates the `pgcrypto` extension and all 14 tables. Do not put
+The schema file creates the `pgcrypto` extension and all 12 tables. Do not put
 real passwords in documentation or source code.
 
 For an existing database created before Phase 2 authentication, run the
@@ -249,9 +229,18 @@ server port. The backend exits with a configuration error if
 ## Documentation
 
 - [planning.md](planning.md) — requirements, progress, and next steps
-- [database.md](database.md) — exact PostgreSQL schema documentation
+- [`database/schema.sql`](database/schema.sql) — PostgreSQL schema source
+- `database/phase*.sql` — incremental database migrations
 - [API.md](API.md) — implemented API routes and pending API work
 - [OOPS.md](OOPS.md) — C++ object-oriented programming analysis
+
+## Database model summary
+
+The schema separates accounts and bearer sessions, vehicles, parking areas and slots,
+parking assignments, reservations, parking sessions, rates, payments, maintenance,
+QR tokens, receipts, and notifications. Foreign keys, uniqueness rules, checks, and
+indexes live in `database/schema.sql` and its migrations; the SQL files are the
+authoritative schema documentation.
 
 ## Limitations and next steps
 

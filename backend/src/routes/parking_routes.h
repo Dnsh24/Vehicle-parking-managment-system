@@ -13,11 +13,17 @@
 namespace routes
 {
 
-void registerParkingRoutes(
-    crow::App<crow::CORSHandler> &app,
-    Database &database,
-    const DatabaseCheckResult &database_check,
-    const std::string &database_name);
+class ParkingRoutes
+{
+public:
+    explicit ParkingRoutes(Database &database);
+    void registerRoutes(
+        crow::App<crow::CORSHandler> &app,
+        const DatabaseCheckResult &database_check,
+        const std::string &database_name);
+
+private:
+    Database &database_;
+};
 
 } // namespace routes
-

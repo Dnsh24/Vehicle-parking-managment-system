@@ -270,13 +270,16 @@
         </section>
       <section class="area-picker panel">
         <div class="area-picker-title">
-          <span class="section-icon" aria-hidden="true">⌖</span>
+          <span class="section-icon" aria-hidden="true">&#x2316;</span>
           <div>
             <p class="label">Parking area</p>
-            <h2>Mall Central Parking Building</h2>
+            <h2 id="areaPickerTitle">Loading&hellip;</h2>
           </div>
         </div>
-        <button class="change-area" id="changeAreaButton" type="button">Change area <span aria-hidden="true">⌄</span></button>
+        <div class="area-dropdown-wrapper" id="areaDropdownWrapper">
+          <button class="change-area" id="changeAreaButton" type="button" aria-haspopup="listbox" aria-expanded="false">Change area <span aria-hidden="true">&#x23C4;</span></button>
+          <ul class="area-dropdown" id="areaDropdown" role="listbox" aria-label="Select parking area" hidden></ul>
+        </div>
       </section>
 
       <section class="summary-grid" aria-label="Parking area summary">
@@ -286,11 +289,11 @@
         </div>
         <div class="summary-card">
           <span class="summary-icon blue" aria-hidden="true">◷</span>
-          <div><span class="label">Operating hours</span><strong>07:00 <small>– 22:00</small></strong></div>
+          <div><span class="label">Operating hours</span><strong id="summaryHours">07:00 – 22:00</strong></div>
         </div>
         <div class="summary-card">
           <span class="summary-icon purple" aria-hidden="true">⌖</span>
-          <div><span class="label">Location</span><strong>Mall Central <small>Parking building</small></strong></div>
+          <div><span class="label">Location</span><strong id="summaryLocation">Mall Central <small>Parking building</small></strong></div>
         </div>
       </section>
 
@@ -308,11 +311,7 @@
             </div>
           </div>
 
-          <nav class="floor-tabs" aria-label="Parking floors">
-            <button class="floor-tab active" type="button" data-floor="ground">Ground floor<span>G</span></button>
-            <button class="floor-tab" type="button" data-floor="first">First floor<span>1</span></button>
-            <button class="floor-tab" type="button" data-floor="second">Second floor<span>2</span></button>
-          </nav>
+          <nav class="floor-tabs" id="floorTabsNav" aria-label="Parking floors"></nav>
           <div class="parking-map" id="parkingMap" aria-label="Top-down parking layout"></div>
 
           <div class="legend" aria-label="Slot status legend">
@@ -431,6 +430,10 @@
           </label>
           <label>Longitude (Optional)
             <input name="longitude" type="number" step="any" min="-180" max="180" placeholder="e.g. 78.4867" />
+          </label>
+          <label class="admin-checkbox-label" id="autoGenerateSlotsLabel">
+            <input type="checkbox" id="autoGenerateSlotsCheck" name="auto_generate_slots" checked />
+            <span>Auto-generate initial parking slots matching capacity</span>
           </label>
           <div class="admin-form-actions">
             <button class="refresh-button" id="saveAreaButton" type="submit">Save Area</button>
@@ -681,6 +684,24 @@
         </div>
       </div>
     </dialog>
+
+    <dialog id="appConfirmDialog" class="exit-modal app-confirm-dialog" aria-labelledby="appConfirmTitle" aria-describedby="appConfirmMessage">
+      <div class="exit-modal-content">
+        <div class="exit-modal-header">
+          <h3 id="appConfirmTitle">Confirm action</h3>
+        </div>
+        <p id="appConfirmMessage" class="app-confirm-message"></p>
+        <div class="exit-modal-actions">
+          <button id="appConfirmCancel" type="button" class="vehicle-cancel">Cancel</button>
+          <button id="appConfirmAccept" type="button" class="refresh-button">Continue</button>
+        </div>
+      </div>
+    </dialog>
+
+    <div id="appNotice" class="app-notice" role="status" aria-live="polite" hidden>
+      <span id="appNoticeMessage"></span>
+      <button id="appNoticeClose" type="button" aria-label="Dismiss notification">×</button>
+    </div>
 
     <script src="js/api.js"></script>
     <script src="js/auth.js"></script>

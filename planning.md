@@ -20,12 +20,15 @@
 - Phase 2 authentication: registration, login, logout, sessions, and profiles
 - Phase 3 vehicle management: authenticated vehicle CRUD, EV-compatible slot
   selection, parking, checkout, map display, and live end-to-end verification
+- Phase 4 administrator operations for users, areas, slots, rates, and maintenance
 - Phase 5 search and reservations: backend, frontend, unit tests, and
   user-verified end-to-end flow completed
+- Phase 6 manual reservation check-in and active parking sessions
+- Phase 7 manual exit, fee summaries, overstay calculation, and settlement status
 - Phase 8 history and in-app notifications: user-scoped paginated history and
   notifications, read/unread controls, and transactional workflow event
   notifications implemented; live database end-to-end verification remains
-- PostgreSQL schema with 14 core tables, constraints, and indexes
+- PostgreSQL schema with 12 core tables, constraints, and indexes
 
 ### In progress
 
@@ -85,8 +88,7 @@ Slot states are:
 - `maintenance`
 - `unavailable`
 
-**Status:** Planned. The schema supports these values, but management APIs and
-screens do not exist.
+**Status:** Implemented for core administration in Phase 4. Area/slot CRUD, rates, and maintenance are managed through admin APIs and screens.
 
 ### Availability and search
 
@@ -103,7 +105,7 @@ A slot is selectable only when it:
 Real-time availability must not be claimed until backend state updates and
 frontend refresh behavior are implemented.
 
-**Status:** Planned.
+**Status:** Implemented. Filtered availability search is available to authenticated users.
 
 ### Reservations
 
@@ -175,7 +177,7 @@ On entry, create a parking session and record `entry_time`. On exit:
 
 The entry and exit state changes must be transactional.
 
-**Status:** Planned. The `parking_sessions` table exists only.
+**Status:** Implemented. Manual reservation check-in creates active sessions; session exit and billing are covered in Phase 7.
 
 ### Overstay and fees
 
@@ -196,8 +198,7 @@ total_fee = base_fee + overstay_fee + additional_charges
 Billing units, rounding, minimum charges, and missing-rate behavior must be
 defined before implementation.
 
-**Status:** Planned. Rate and fee tables exist, but no calculation service
-exists.
+**Status:** Implemented for basic hourly and overstay billing in Phase 7. Advanced fee rules remain planned.
 
 ### Payments and receipts
 
@@ -214,7 +215,7 @@ session, timing, fee breakdown, payment status, and receipt number.
 Payment processing must not be described as implemented without a working
 payment flow.
 
-**Status:** Planned. The `payments` and `receipts` tables exist only.
+**Status:** Manual payment status recording is implemented at session exit. Online payment processing and digital receipts remain planned.
 
 ### History and notifications
 
@@ -303,12 +304,11 @@ database-backed runtime verification are working with seeded parking slots.
   maintenance slots against the running database.
 
 References: `parking_areas`, `parking_slots`, and `maintenance` in
-[database.md](database.md).
+[database/schema.sql](database/schema.sql).
 
 #### Phase 2: Authentication and profiles
 
-**Status:** Backend and frontend flows implemented; runtime verification and
-end-to-end error-path testing remain.
+**Status:** Implemented. Backend and frontend auth/profile flows use bearer sessions; additional runtime error-path checks remain useful.
 
 - Backend: registration, login, logout, password hashing, authorization, and
   profile operations.
@@ -316,7 +316,7 @@ end-to-end error-path testing remain.
 - Test duplicate emails, invalid credentials, inactive accounts, and
   unauthenticated access.
 
-Reference: `users` in [database.md](database.md).
+Reference: `users` in [database/schema.sql](database/schema.sql).
 
 #### Phase 3: Vehicle management
 
@@ -331,7 +331,7 @@ end-to-end vehicle parking and checkout flows have been verified.
   available-slot selection, and active parking/checkout display.
 - Test duplicate registrations, invalid types, and unauthorized access.
 
-Reference: `vehicles` in [database.md](database.md).
+Reference: `vehicles` in [database/schema.sql](database/schema.sql).
 
 #### Phase 4: Basic administration and maintenance
 
@@ -351,7 +351,7 @@ tests have been verified.
 - Testing: unit response tests in `backend/tests/admin_tests.cpp`, role checks,
   duplicate prevention, and live end-to-end integration verified.
 
-References: Section 4; related tables in [database.md](database.md).
+References: Section 4; related tables in [database/schema.sql](database/schema.sql).
 
 #### Phase 5: Search and reservations
 
@@ -366,7 +366,7 @@ the end-to-end flow against the running application.
   selected slot within a transaction to prevent concurrent conflicting claims.
 
 References: `reservations`, `parking_slots`, and `parking_rates` in
-[database.md](database.md).
+[database/schema.sql](database/schema.sql).
 
 #### Phase 6: Manual entry and parking sessions
 
@@ -381,7 +381,7 @@ transactionally, and active sessions are shown in the user dashboard.
   maintenance slots.
 
 References: `reservations` and `parking_sessions` in
-[database.md](database.md).
+[database/schema.sql](database/schema.sql).
 
 #### Phase 7: Manual exit, basic overstay billing, and fee summary
 
@@ -405,12 +405,11 @@ implemented and verified.
 - Verified normal exit, overstay calculations, duplicate exit rejection (409),
   ownership isolation (404), unauthenticated rejection (401), and slot liberation.
 
-References: `parking_sessions` and `parking_rates` in [database.md](database.md).
+References: `parking_sessions` and `parking_rates` in [database/schema.sql](database/schema.sql).
 
 #### Phase 8: Basic history and in-app notifications
 
-**Status:** Backend and frontend implemented; backend build and existing unit
-suite pass. Phase 8-specific and live database end-to-end verification remain.
+**Status:** Backend and frontend implemented. Live database end-to-end verification remains.
 
 - Backend: user-scoped history, notifications, unread status, and event
   notifications for reservation confirmation, cancellation, check-in, exit,
@@ -426,7 +425,7 @@ suite pass. Phase 8-specific and live database end-to-end verification remain.
   and event delivery against a running PostgreSQL/Crow application.
 
 References: `reservations`, `parking_sessions`, and `notifications` in
-[database.md](database.md).
+[database/schema.sql](database/schema.sql).
 
 ### Version 2: Automation, payments, and advanced management
 
@@ -445,7 +444,7 @@ frontend, integration, and tests are complete.
   and maintenance slots.
 
 References: `qr_tokens`, `reservations`, and `parking_sessions` in
-[database.md](database.md).
+[database/schema.sql](database/schema.sql).
 
 #### Phase 10: Online payments and digital receipts
 
@@ -457,7 +456,7 @@ References: `qr_tokens`, `reservations`, and `parking_sessions` in
   receipt ownership.
 
 References: `payments`, `receipts`, `parking_sessions`, and `parking_rates`
-in [database.md](database.md).
+in [database/schema.sql](database/schema.sql).
 
 #### Phase 11: Advanced fees, notifications, and maintenance
 
@@ -541,5 +540,5 @@ implemented merely because its database tables already exist.
 
 - [README.md](README.md) — overview, setup, and current implementation
 - [API.md](API.md) — verified REST endpoints only
-- [database.md](database.md) — actual PostgreSQL schema
+- [database/schema.sql](database/schema.sql) — PostgreSQL schema source
 - [OOPS.md](OOPS.md) — actual C++ structure and OOP concepts

@@ -3,6 +3,75 @@
 // =====================================================================
 
 const API_BASE = "http://localhost:3000";
+let appNoticeTimeout = null;
+
+function showAppNotice(message, type = "success") {
+    const notice = document.getElementById("appNotice");
+    const noticeMessage = document.getElementById("appNoticeMessage");
+    if (!notice || !noticeMessage || !message) return;
+
+    noticeMessage.textContent = message;
+    notice.classList.toggle("is-error", type === "error");
+    notice.classList.toggle("is-info", type === "info");
+    notice.setAttribute("role", type === "error" ? "alert" : "status");
+    notice.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+    notice.hidden = false;
+    window.clearTimeout(appNoticeTimeout);
+    appNoticeTimeout = window.setTimeout(() => {
+        notice.hidden = true;
+    }, 6500);
+}
+
+document.getElementById("appNoticeClose")?.addEventListener("click", () => {
+    const notice = document.getElementById("appNotice");
+    if (notice) notice.hidden = true;
+    window.clearTimeout(appNoticeTimeout);
+});
+
+function showAppConfirm(message, options = {}) {
+    const dialog = document.getElementById("appConfirmDialog");
+    const title = document.getElementById("appConfirmTitle");
+    const content = document.getElementById("appConfirmMessage");
+    const cancelButton = document.getElementById("appConfirmCancel");
+    const acceptButton = document.getElementById("appConfirmAccept");
+    if (!dialog || !title || !content || !cancelButton || !acceptButton) {
+        console.error("The in-app confirmation dialog is unavailable.");
+        return Promise.resolve(false);
+    }
+
+    title.textContent = options.title || "Confirm action";
+    content.textContent = message;
+    cancelButton.textContent = options.cancelLabel || "Cancel";
+    acceptButton.textContent = options.acceptLabel || "Continue";
+
+    return new Promise((resolve) => {
+        const handleClose = () => {
+            cleanup();
+            resolve(dialog.returnValue === "confirm");
+        };
+        const handleCancel = (event) => {
+            event.preventDefault();
+            dialog.close("cancel");
+        };
+        const cleanup = () => {
+            dialog.removeEventListener("cancel", handleCancel);
+            cancelButton.removeEventListener("click", handleCancelClick);
+            acceptButton.removeEventListener("click", handleAcceptClick);
+        };
+        const finish = (value) => {
+            dialog.close(value);
+        };
+        const handleCancelClick = () => finish("cancel");
+        const handleAcceptClick = () => finish("confirm");
+
+        dialog.addEventListener("close", handleClose, { once: true });
+        dialog.addEventListener("cancel", handleCancel);
+        cancelButton.addEventListener("click", handleCancelClick);
+        acceptButton.addEventListener("click", handleAcceptClick);
+        dialog.showModal();
+        acceptButton.focus();
+    });
+}
 
 function authHeaders() {
     const token = window.localStorage.getItem("parking_auth_token") || window.sessionStorage.getItem("parking_auth_token");

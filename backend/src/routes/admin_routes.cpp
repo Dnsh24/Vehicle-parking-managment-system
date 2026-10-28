@@ -11,8 +11,11 @@
 namespace routes
 {
 
-void registerAdminRoutes(crow::App<crow::CORSHandler> &app, Database &database)
+AdminRoutes::AdminRoutes(Database &database) : database_(database) {}
+
+void AdminRoutes::registerRoutes(crow::App<crow::CORSHandler> &app)
 {
+    Database &database = database_;
     // ---- Users: list ----
     CROW_ROUTE(app, "/api/admin/users")
     ([&database](const crow::request &request)

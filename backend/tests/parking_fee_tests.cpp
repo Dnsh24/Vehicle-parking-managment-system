@@ -31,6 +31,13 @@ int main()
     assert(immediate_slot_booking.overtime_fee == 23.0);
     assert(immediate_slot_booking.total_fee == 63.0);
 
+    const auto one_hour_reservation_with_overtime =
+        parking::fees::calculate(60, 66 * 60, 40.0);
+    assert(one_hour_reservation_with_overtime.billed_hours == 1);
+    assert(one_hour_reservation_with_overtime.base_fee == 40.0);
+    assert(one_hour_reservation_with_overtime.overtime_fee == 66.0);
+    assert(one_hour_reservation_with_overtime.total_fee == 106.0);
+
     const auto overtime_ignores_hourly_rate = parking::fees::calculate(60, 1800, 1000.0);
     assert(overtime_ignores_hourly_rate.overtime_fee == 30.0);
 

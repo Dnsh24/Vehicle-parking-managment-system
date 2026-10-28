@@ -25,11 +25,13 @@ const notificationPageSize = 10;
 let historyPageOffset = 0;
 let notificationPageOffset = 0;
 let reservationsById = new Map();
+let suppressNextAvailabilityNotice = false;
 
 function setReservationMessage(message, isError = false) {
     if (!reservationMessage) return;
     reservationMessage.textContent = message;
     reservationMessage.classList.toggle("is-error", isError);
+    if (message && isError) showAppNotice(message, "error");
 }
 
 function setReservationDateDefaults() {
@@ -131,8 +133,10 @@ function renderReservationResults(slots) {
     const bookedHours = Math.max(
         1,
         Math.ceil(
-            (new Date(reservationSearchForm.elements.end_time.value) -
-                new Date(reservationSearchForm.elements.start_time.value)) / 3600000
+            Math.floor(
+                (new Date(reservationSearchForm.elements.end_time.value) -
+                    new Date(reservationSearchForm.elements.start_time.value)) / 60000
+            ) / 60
         )
     );
     reservationResults.replaceChildren();
@@ -529,11 +533,17 @@ if (reservationSearchForm) {
                 { headers: authHeaders() }
             );
             const data = await response.json();
+            const suppressNotice = suppressNextAvailabilityNotice;
+            suppressNextAvailabilityNotice = false;
             if (!response.ok || !Array.isArray(data.slots)) {
                 throw new Error(data.error?.message || "Parking availability could not be searched.");
             }
+            if (data.slots.length === 0 && !suppressNotice) {
+                showAppNotice("No matching parking slots are available for the selected time.", "info");
+            }
             renderReservationResults(data.slots);
         } catch (error) {
+            suppressNextAvailabilityNotice = false;
             setReservationMessage(error.message, true);
         }
     });
@@ -552,8 +562,9 @@ if (reservationResults) {
                 style: "currency",
                 currency: "INR"
             }).format(bookedHours * hourlyRate);
-            if (!window.confirm(
-                `Reserve this slot for ${bookedHours} billed hour${bookedHours === 1 ? "" : "s"} (${fullSlotPrice})? The full booked time is charged even if you leave early. At check-in, the first 7 minutes after the booked end are free; then overtime costs ₹1 per minute, with each started minute charged as a full minute.`
+            if (!await showAppConfirm(
+                `Reserve this slot for ${bookedHours} billed hour${bookedHours === 1 ? "" : "s"} (${fullSlotPrice})? The full booked time is charged even if you leave early. Check in within 5 minutes after the reservation start or it will be cancelled. After the booked end, the first 7 minutes are free; then overtime costs ₹1 per started minute.`,
+                { title: "Confirm reservation", acceptLabel: "Reserve slot" }
             )) {
                 return;
             }
@@ -571,7 +582,9 @@ if (reservationResults) {
                 throw new Error(data.error?.message || "The reservation could not be created.");
             }
             setReservationMessage(`Reservation #${data.reservation.reservation_id} confirmed for ${data.reservation.slot_number}.`);
+            showAppNotice(`Reservation confirmed. Slot ${data.reservation.slot_number} is booked.`);
             await Promise.all([loadReservations(), loadNotifications()]);
+            suppressNextAvailabilityNotice = true;
             reservationSearchForm.requestSubmit();
         } catch (error) {
             setReservationMessage(error.message, true);
@@ -592,7 +605,9 @@ if (reservationList) {
                 }
                 const bookedHours = Math.max(
                     1,
-                    Math.ceil((Date.parse(reservation.end_time) - Date.parse(reservation.start_time)) / 3600000)
+                    Math.ceil(
+                        Math.floor((Date.parse(reservation.end_time) - Date.parse(reservation.start_time)) / 60000) / 60
+                    )
                 );
                 const hourlyRate = Number(reservation.hourly_rate);
                 if (!Number.isFinite(hourlyRate) || hourlyRate < 0) {
@@ -603,8 +618,9 @@ if (reservationList) {
                     style: "currency",
                     currency: "INR"
                 }).format(bookedFee);
-                if (!window.confirm(
-                    `Check in to reservation #${reservation.reservation_id}? The full booked slot duration (${bookedHours} hour${bookedHours === 1 ? "" : "s"}, ${currency}) is charged even if you leave early. After the booked end time, the first 7 minutes are free; then overtime costs ₹1 per minute, with each started minute charged as a full minute.`
+                if (!await showAppConfirm(
+                    `Check in to reservation #${reservation.reservation_id}? The full booked slot duration (${bookedHours} hour${bookedHours === 1 ? "" : "s"}, ${currency}) is charged even if you leave early. Check in within 5 minutes after the reservation start or it will be cancelled. After the booked end, the first 7 minutes are free; then overtime costs ₹1 per started minute.`,
+                    { title: "Confirm check-in", acceptLabel: "Check in" }
                 )) {
                     return;
                 }
@@ -614,12 +630,22 @@ if (reservationList) {
                     headers: authHeaders()
                 });
                 const data = await response.json();
+                if (!response.ok && data.error?.code === "RESERVATION_CANCELLED_LATE") {
+                    await Promise.all([
+                        loadReservations(),
+                        loadParkingHistory(),
+                        loadNotifications()
+                    ]);
+                    setReservationMessage(data.error.message, true);
+                    return;
+                }
                 if (!response.ok || !data.session) {
                     throw new Error(data.error?.message || "The reservation could not be checked in.");
                 }
                 setReservationMessage(
                     `Checked in successfully. ${data.session.registration_number} is parked at ${data.session.area_name}, ${data.session.slot_number}.`
                 );
+                showAppNotice(`Check-in complete. ${data.session.slot_number} is ready for you.`);
                 await Promise.all([loadReservations(), loadActiveParkingSessions(), loadNotifications()]);
                 return;
             }
@@ -649,7 +675,9 @@ if (reservationList) {
                 throw new Error(data.error?.message || "The reservation could not be cancelled.");
             }
             setReservationMessage(`Reservation #${reservationId} cancelled.`);
+            showAppNotice(`Reservation #${reservationId} cancelled.`);
             await Promise.all([loadReservations(), loadParkingHistory(), loadNotifications()]);
+            suppressNextAvailabilityNotice = true;
             reservationSearchForm.requestSubmit();
         } catch (error) {
             if (button.dataset.action === "check-in") {
@@ -912,6 +940,9 @@ async function showSessionExitModal(sessionId, isCheckoutMode) {
                     setReservationMessage(
                         `Vehicle ${exitData.session.registration_number} checked out successfully! Slot ${exitData.session.slot_number} has been released. Total fee: ₹${exitData.session.total_fee.toFixed(2)} (${exitData.session.payment_status}).`
                     );
+                    showAppNotice(
+                        `Checkout complete. Slot ${exitData.session.slot_number} is released. Total fee: ₹${exitData.session.total_fee.toFixed(2)}.`
+                    );
                     await Promise.all([
                         loadReservations(),
                         loadActiveParkingSessions(),
@@ -924,7 +955,7 @@ async function showSessionExitModal(sessionId, isCheckoutMode) {
                 } catch (err) {
                     confirmBtn.disabled = false;
                     confirmBtn.textContent = "Confirm Exit & Release Slot";
-                    alert(err.message);
+                    showAppNotice(err.message, "error");
                 }
             });
 

@@ -15,8 +15,11 @@
 namespace routes
 {
 
-void registerVehicleRoutes(crow::App<crow::CORSHandler> &app, Database &database)
+VehicleRoutes::VehicleRoutes(Database &database) : database_(database) {}
+
+void VehicleRoutes::registerRoutes(crow::App<crow::CORSHandler> &app)
 {
+    Database &database = database_;
     CROW_ROUTE(app, "/api/vehicles").methods(crow::HTTPMethod::GET)
     ([&database](const crow::request &request)
      {
@@ -281,7 +284,7 @@ void registerVehicleRoutes(crow::App<crow::CORSHandler> &app, Database &database
                 "to_char(times.now AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS exit_time_str, "
                 "to_char(a.scheduled_end AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS scheduled_end_str, "
                 "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (times.now - a.parked_at)) / 60.0)::INTEGER) AS duration_minutes, "
-                "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (a.scheduled_end - a.parked_at)) / 60.0)::INTEGER) AS planned_duration_minutes, "
+                "GREATEST(1, FLOOR(EXTRACT(EPOCH FROM (a.scheduled_end - a.parked_at)) / 60.0)::INTEGER) AS planned_duration_minutes, "
                 "GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (times.now - a.scheduled_end - INTERVAL '7 minutes')))::INTEGER) AS overtime_duration_seconds, "
                 "COALESCE(pr.hourly_rate, 40.00) AS hourly_rate "
                 "FROM parking_assignments a "
@@ -395,7 +398,7 @@ void registerVehicleRoutes(crow::App<crow::CORSHandler> &app, Database &database
                 "to_char(times.now AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS exit_time_str, "
                 "to_char(a.scheduled_end AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS scheduled_end_str, "
                 "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (times.now - a.parked_at)) / 60.0)::INTEGER) AS duration_minutes, "
-                "GREATEST(1, CEIL(EXTRACT(EPOCH FROM (a.scheduled_end - a.parked_at)) / 60.0)::INTEGER) AS planned_duration_minutes, "
+                "GREATEST(1, FLOOR(EXTRACT(EPOCH FROM (a.scheduled_end - a.parked_at)) / 60.0)::INTEGER) AS planned_duration_minutes, "
                 "GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (times.now - a.scheduled_end - INTERVAL '7 minutes')))::INTEGER) AS overtime_duration_seconds, "
                 "COALESCE(pr.hourly_rate, 40.00) AS hourly_rate "
                 "FROM parking_assignments a "
