@@ -14,11 +14,31 @@
 \usepackage{tabularx}
 \usepackage{array}
 \usepackage{float}
+\usepackage{fancyhdr}
+\usepackage{tocloft}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
 \usepackage{hyperref}
 
 \hypersetup{colorlinks=true,linkcolor=blue!50!black,urlcolor=blue!50!black}
+% Group-prefixed hierarchy: section 18.1, subsection 18.1.1, etc.
+\renewcommand{\thesection}{18.\arabic{section}}
+\renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
+\renewcommand{\thesubsubsection}{\thesubsection.\arabic{subsubsection}}
+% Keep all figures, tables, and code listings numbered continuously.
+\renewcommand{\thefigure}{\arabic{figure}}
+\renewcommand{\thetable}{\arabic{table}}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{Group 18 | VPMS Final Report}
+\fancyhead[R]{\nouppercase{\leftmark}}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0pt}
+\setlength{\headheight}{15pt}
+% Reserve enough space for group-prefixed section numbers in the contents.
+\setlength{\cftsecnumwidth}{4.2em}
+\setlength{\cftsubsecnumwidth}{5.4em}
 \lstset{
   language=C++,
   basicstyle=\ttfamily\footnotesize,
@@ -56,6 +76,7 @@
 {\large Ramcharan Tej Vankudoth\hfill Roll No. 251160\par}
 \vfill
 \newpage
+\markboth{Contents}{Contents}
 \renewcommand{\contentsname}{Contents}
 \begingroup\small\tableofcontents\endgroup
 \clearpage
