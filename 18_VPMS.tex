@@ -56,30 +56,8 @@
 {\large Ramcharan Tej Vankudoth\hfill Roll No. 251160\par}
 \vfill
 \newpage
-\section*{Contents}
-\small
-\begin{tabularx}{\textwidth}{@{}Xr@{}}
-\textbf{1 Introduction and Problem Statement}\dotfill & 3 \\
-\textbf{2 Scope and Feature Set}\dotfill & 3 \\
-\hspace{1em}2.1 Users and Operating Environment\dotfill & 3 \\
-\hspace{1em}2.2 Representative API Surface\dotfill & 4 \\
-\textbf{3 Object-Oriented Architecture}\dotfill & 4 \\
-\hspace{1em}3.1 Object-Oriented Concepts Demonstrated\dotfill & 4 \\
-\hspace{1em}3.2 Class Design and Associations\dotfill & 5 \\
-\hspace{1em}3.3 Architecture\dotfill & 6 \\
-\hspace{1em}3.4 Reservation Sequence Diagram\dotfill & 7 \\
-\hspace{1em}3.5 Activity Diagram: Direct Parking\dotfill & 8 \\
-\hspace{1em}3.6 Use Case Diagram\dotfill & 8 \\
-\hspace{1em}3.7 OOP Code Examples\dotfill & 9 \\
-\textbf{4 Database Design and Persistence}\dotfill & 11 \\
-\hspace{1em}4.1 Fee Rules\dotfill & 11 \\
-\textbf{5 Project Interface and Execution Outputs}\dotfill & 12 \\
-\hspace{1em}5.1 Build and Run\dotfill & 22 \\
-\hspace{1em}5.2 Project Source Map\dotfill & 23 \\
-\textbf{6 Limitations and Future Work}\dotfill & 23 \\
-\textbf{7 Conclusion}\dotfill & 23 \\
-\end{tabularx}
-\normalsize
+\renewcommand{\contentsname}{Contents}
+\begingroup\small\tableofcontents\endgroup
 \clearpage
 
 \section{Introduction and Problem Statement}
@@ -103,6 +81,27 @@ reservations, and keeping an auditable record of parking sessions and fees.
 The current implementation supports manual check-in and exit. Automated
 reservation expiry, QR processing, online payment processing, and advanced
 reporting are outside the implemented feature set.
+
+\section{Technology Stack}
+The project combines browser technologies, a C++ backend, and a relational
+database. The following list reflects the tools and libraries used by the
+current source code.
+
+\begin{itemize}
+  \item \textbf{Frontend:} HTML5, CSS3, and vanilla JavaScript, served as a
+  browser-based single-page interface.
+  \item \textbf{Backend language:} C++20.
+  \item \textbf{HTTP framework:} Crow, used to define the REST-style backend
+  routes and host the HTTP server.
+  \item \textbf{API format:} HTTP requests and JSON responses, with bearer
+  tokens for authenticated operations.
+  \item \textbf{Database:} PostgreSQL, accessed from C++ through libpqxx.
+  \item \textbf{Cryptography:} OpenSSL Crypto, linked by the backend for
+  authentication-related cryptographic operations.
+  \item \textbf{Build and dependency configuration:} CMake 3.20 or newer;
+  CMake FetchContent obtains Crow, while libpqxx and OpenSSL are required
+  dependencies.
+\end{itemize}
 
 \section{Scope and Feature Set}
 \begin{itemize}
