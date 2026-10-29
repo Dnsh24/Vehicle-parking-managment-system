@@ -28,7 +28,49 @@ features or CRUD operations are implemented.
 
 ## Diagrams
 
-The TikZ source for the architecture and current OOP class diagrams is [`diagrams.tex`](diagrams.tex); the compiled PDF is [`diagrams-table.pdf`](diagrams-table.pdf).
+### System architecture
+
+```mermaid
+%%{init: {"flowchart": {"curve": "linear"}}}%%
+flowchart TD
+    Client["Web Client<br/>HTML, CSS, and JavaScript interface"]
+    API["HTTP / JSON API<br/>Browser requests and backend responses"]
+    Routes["C++20 Crow REST API<br/>Authentication, parking, vehicle, reservation, and administrator routes"]
+    App["ParkingApplication<br/>Application startup, CORS configuration, and route wiring"]
+    Data["Database access<br/>C++ database layer using libpqxx"]
+    PostgreSQL["PostgreSQL<br/>Persistent parking system data"]
+
+    Client --> API --> Routes --> App --> Data --> PostgreSQL
+```
+
+### UML class diagram
+
+```mermaid
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 45, "rankSpacing": 65}}}%%
+flowchart TD
+    App["ParkingApplication<br/>---------------------------<br/>- config_: BackendConfig<br/>- database_: Database<br/>- app_: Crow application<br/>- route controller members<br/>---------------------------<br/>+ run()<br/>- configureCors()<br/>- registerRoutes(...)"]
+
+    Auth["AuthRoutes<br/>---------------------------<br/>- database_: Database&amp;<br/>---------------------------<br/>+ AuthRoutes(Database&amp;)<br/>+ registerRoutes(app)"]
+    Parking["ParkingRoutes<br/>---------------------------<br/>- database_: Database&amp;<br/>---------------------------<br/>+ ParkingRoutes(Database&amp;)<br/>+ registerRoutes(app, check, name)"]
+    Vehicle["VehicleRoutes<br/>---------------------------<br/>- database_: Database&amp;<br/>---------------------------<br/>+ VehicleRoutes(Database&amp;)<br/>+ registerRoutes(app)"]
+    Reservation["ReservationRoutes<br/>---------------------------<br/>- database_: Database&amp;<br/>---------------------------<br/>+ ReservationRoutes(Database&amp;)<br/>+ registerRoutes(app)"]
+    Admin["AdminRoutes<br/>---------------------------<br/>- database_: Database&amp;<br/>---------------------------<br/>+ AdminRoutes(Database&amp;)<br/>+ registerRoutes(app)"]
+
+    DB["Database<br/>---------------------------<br/>- config_: BackendConfig<br/>---------------------------<br/>+ checkConnection()<br/>+ executeRead() / executeWrite()<br/>+ parkVehicle()<br/>+ createReservation() / checkInReservation()<br/>+ cancelReservation() / exitParkingSession()<br/>+ getSessionFeeSummary()"]
+
+    App -->|composition| Auth
+    App -->|composition| Parking
+    App -->|composition| Vehicle
+    App -->|composition| Reservation
+    App -->|composition| Admin
+    Auth -->|association| DB
+    Parking -->|association| DB
+    Vehicle -->|association| DB
+    Reservation -->|association| DB
+    Admin -->|association| DB
+```
+
+The editable TikZ versions of these diagrams are in [`diagrams.tex`](diagrams.tex).
 
 Authentication, profiles, parking availability, vehicle management, basic
 administrator management and maintenance, reservations, manual check-in and
@@ -87,33 +129,45 @@ implemented as complete application functionality:
 ## Actual project structure
 
 ```text
-README.md
-planning.md
-API.md
-OOPS.md
-PROMPTS.md
-diagrams.tex
+README.md                         Project overview, setup, and structure
+API.md                            Implemented API reference and pending work
+OOPS.md                           Object-oriented design notes
+planning.md                       Requirements, progress, and next steps
+PROMPTS.md                        Project prompt/history notes
+diagrams.tex                      TikZ architecture and OOP diagrams
+diagrams.pdf                      Compiled diagrams
+18_VPMS.tex                       CS3104 mini-project report source
+18_VPMS.pdf                       Compiled report
+report_screenshots/               Screenshots embedded in the report
+  *.png
 backend/
-  CMakeLists.txt
+  CMakeLists.txt                  CMake build configuration
   src/
-    application/  ParkingApplication lifecycle and dependency wiring
-    api/          Response and error helpers
-    auth/         Password and token utilities
-    config/       Environment configuration
-    database/     Database access and fee calculation
-    routes/       Auth, parking, reservation, vehicle, and admin controllers
-    validation/   Request validation
-    main.cpp      Environment setup and application startup
+    main.cpp                      Environment setup and application startup
+    application/                  ParkingApplication lifecycle and dependency wiring
+    api/                          Response and error helpers
+    auth/                         Password and token utilities
+    config/                       Environment configuration
+    database/                     Database access and fee calculation
+    routes/                       Auth, parking, reservation, vehicle, and admin controllers
+    validation/                   Request validation
   tests/
-    API, auth, config, database, admin, validation, and fee tests
+    api_tests.cpp                 API response and route behavior tests
+    auth_tests.cpp                Authentication tests
+    config_tests.cpp              Configuration tests
+    database_tests.cpp            Database tests
+    admin_tests.cpp               Administrator operation tests
+    validation_tests.cpp          Request validation tests
+    parking_fee_tests.cpp         Fee calculation tests
 database/
-  schema.sql
-  phase migrations and development seeds
+  schema.sql                      Base PostgreSQL schema
+  phase*.sql, overtime.sql        Incremental migrations
+  seed*.sql                       Development seed data
 frontend/
-  index.html
-  css/
-  js/
-  assets/
+  index.html                      Single-page application
+  css/style.css                   Application styles
+  js/                             API, auth, parking, vehicles, reservations, admin
+  assets/images/                  Parking background and vehicle illustrations
 ```
 
 Build output under `backend/build/` is generated and omitted from the source tree.
