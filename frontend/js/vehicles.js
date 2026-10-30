@@ -582,6 +582,9 @@ async function showVehicleExitModal(vehicleId) {
                 if (typeof loadReservations === "function") {
                     await loadReservations();
                 }
+                if (typeof loadNotifications === "function") {
+                    await loadNotifications();
+                }
                 const parkingArea = areas.find((area) => String(area.area_id) === String(checkoutData.area_id));
                 if (parkingArea) {
                     await loadFloor(parkingArea);

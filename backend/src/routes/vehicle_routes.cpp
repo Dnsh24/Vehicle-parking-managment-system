@@ -428,12 +428,12 @@ void VehicleRoutes::registerRoutes(crow::App<crow::CORSHandler> &app)
                 overtime_duration_seconds,
                 hourly_rate);
 
-            database.executeWrite(
+            const pqxx::result checkout_rows = database.executeWrite(
+                "WITH checked_out AS ("
                 "UPDATE parking_assignments SET checkout_at = CURRENT_TIMESTAMP "
-                "WHERE vehicle_id = $1 AND user_id = $2 AND checkout_at IS NULL",
-                pqxx::params{vehicle_id, user->user_id});
-
-            database.executeWrite(
+                "WHERE vehicle_id = $1 AND user_id = $2 AND checkout_at IS NULL "
+                "RETURNING slot_id), "
+                "updated_slot AS ("
                 "UPDATE parking_slots ps SET status = CASE "
                 "WHEN EXISTS (SELECT 1 FROM parking_sessions s "
                 "WHERE s.slot_id = ps.slot_id AND s.exit_time IS NULL "
@@ -442,8 +442,29 @@ void VehicleRoutes::registerRoutes(crow::App<crow::CORSHandler> &app)
                 "WHERE r.slot_id = ps.slot_id AND r.status IN ('pending', 'confirmed', 'active') "
                 "AND r.start_time <= CURRENT_TIMESTAMP AND r.end_time > CURRENT_TIMESTAMP) THEN 'reserved' "
                 "ELSE 'available' END "
-                "WHERE ps.slot_id = $1",
-                pqxx::params{slot_id});
+                "FROM checked_out c WHERE ps.slot_id = c.slot_id "
+                "RETURNING ps.slot_id), "
+                "created_notification AS ("
+                "INSERT INTO notifications (user_id, title, message, type) "
+                "SELECT $2, 'Parking session complete', "
+                "'Vehicle ' || $3 || ' checked out. Final fee: INR ' || "
+                "to_char($4::numeric, 'FM999999990.00') || '.', 'exit' "
+                "FROM checked_out RETURNING notification_id) "
+                "SELECT updated_slot.slot_id FROM updated_slot "
+                "CROSS JOIN (SELECT COUNT(*) FROM created_notification) notification_count",
+                pqxx::params{
+                    vehicle_id,
+                    user->user_id,
+                    row["registration_number"].as<std::string>(),
+                    fee.total_fee});
+
+            if (checkout_rows.empty())
+            {
+                return api::errorResponse(
+                    409,
+                    "ACTIVE_PARKING_NOT_FOUND",
+                    "This vehicle no longer has an active parking assignment.");
+            }
 
             api::SessionFeeSummaryData summary;
             summary.session_id = 0;
