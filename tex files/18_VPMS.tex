@@ -51,6 +51,7 @@
   breaklines=true,
   frame=single,
   rulecolor=\color{black!25},
+  captionpos=b,
   showstringspaces=false,
   columns=fullflexible,
   keepspaces=true,
@@ -371,27 +372,27 @@ classes.
 \centering
 \resizebox{0.96\textwidth}{!}{%
 \begin{tikzpicture}[
-  actor/.style={draw,rounded corners,align=center,minimum width=2cm,minimum height=0.65cm,font=\small\sffamily},
-  usecase/.style={draw,ellipse,align=center,text width=3.1cm,minimum height=0.8cm,font=\scriptsize\sffamily},
+  actor/.style={draw,rounded corners,align=center,minimum width=2.2cm,minimum height=0.75cm,font=\small\sffamily},
+  usecase/.style={draw,ellipse,align=center,text width=4cm,minimum height=1.15cm,inner ysep=5pt,font=\small\sffamily},
   link/.style={draw,gray!80},
   include/.style={-{Stealth},dashed,gray!70},
   generalize/.style={-{Triangle[open]},thick}
 ]
-\node[draw,rounded corners,minimum width=10.7cm,minimum height=8.2cm] (boundary) at (2,-0.1) {};
-\node[font=\bfseries\sffamily] at (2,3.65) {Vehicle Parking Management System};
-\node[actor] (driver) at (-5,0.8) {Driver};
-\node[actor] (admin) at (-5,-2.9) {Administrator};
-\node[usecase] (account) at (2,2.75) {Register, sign in, and manage profile};
-\node[usecase] (vehicles) at (2,1.85) {Manage vehicles};
-\node[usecase] (availability) at (2,0.95) {Find compatible parking};
-\node[usecase] (reserve) at (2,0.05) {Reserve, check in, and cancel};
-\node[usecase] (sessions) at (2,-0.85) {View sessions, fees, history, and notifications};
-\node[usecase] (direct) at (2,-1.75) {Park directly and check out};
-\node[usecase] (manage) at (2,-2.95) {Manage users, areas, slots, rates, and maintenance};
+\node[draw,rounded corners,minimum width=10.7cm,minimum height=17.8cm] (boundary) at (2,-0.5) {};
+\node[font=\bfseries\sffamily] at (2,7.75) {Vehicle Parking Management System};
+\node[actor] (driver) at (-7.2,-0.5) {Driver};
+\node[actor] (admin) at (-7.2,-7.4) {Administrator};
+\node[usecase] (account) at (2,6.4) {Register, sign in, and manage profile};
+\node[usecase] (vehicles) at (2,4.1) {Manage vehicles};
+\node[usecase] (availability) at (2,1.8) {Find compatible parking};
+\node[usecase] (reserve) at (2,-0.5) {Reserve, check in, and cancel};
+\node[usecase] (sessions) at (2,-2.8) {View sessions, fees, history, and notifications};
+\node[usecase] (direct) at (2,-5.1) {Park directly and check out};
+\node[usecase] (manage) at (2,-7.4) {Manage users, areas, slots, rates, and maintenance};
 % Route driver links outside the use cases so no line crosses an oval.
-\coordinate (driverbus) at (-1.4,0.8);
+\coordinate (driverbus) at (-4.2,-0.5);
 \draw[link] (driver.east)--(driverbus);
-\draw[link] (-1.4,2.75)--(-1.4,-1.75);
+\draw[link] (-4.2,6.4)--(-4.2,-5.1);
 \foreach \n in {account,vehicles,availability,reserve,sessions,direct} {
   \draw[link] (driverbus |- \n.west) -- (\n.west);
 }
